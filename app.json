@@ -39,6 +39,18 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/3aaa6cfc-feb2-4f05-9def-8cfed74ce8c5"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "3aaa6cfc-feb2-4f05-9def-8cfed74ce8c5"
+      }
+    },
+    "owner": "jvjoaovictorguedes"
   }
 }

@@ -11,11 +11,15 @@
     "expo-linking": "^57.0.11",
     "expo-router": "^57.0.24",
     "expo-status-bar": "~57.0.1",
+    "expo-updates": "~57.0.24",
     "react": "19.2.3",
     "react-native": "0.86.3",
     "react-native-gesture-handler": "^3.3.0",
     "react-native-safe-area-context": "^5.10.1",
     "react-native-screens": "^4.28.0"
+  },
+  "overrides": {
+    "react-dom": "19.2.3"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
