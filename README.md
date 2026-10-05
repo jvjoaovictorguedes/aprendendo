@@ -8,6 +8,7 @@ App mobile (Expo / React Native) para clientes de supermercado. O cliente **bipa
 
 **Scan & Go (núcleo do app):**
 - Leitura de código de barras (EAN-13, EAN-8, UPC-A, UPC-E, Code128) pela câmera, usando `expo-camera`, com feedback imediato (nome, preço, **desfazer**) e háptico a cada bipagem.
+- Busca de produto **real no Supabase** quando configurado (ver seção abaixo), com fallback automático pro catálogo local se o Supabase não estiver configurado ou a chamada falhar — o scanner nunca trava esperando resposta.
 - Cada bipagem soma automaticamente ao carrinho (produto repetido = quantidade +1).
 - Câmera pausa automaticamente quando a aba não está em foco (bateria/privacidade).
 - Tela **Carrinho** com lista dos itens, favoritar, ajuste manual de quantidade, remoção e total com hierarquia visual forte.
@@ -24,17 +25,35 @@ App mobile (Expo / React Native) para clientes de supermercado. O cliente **bipa
 - Tudo persistido localmente (`AsyncStorage`) — fechar o app não perde nada.
 - Design system centralizado em `src/theme/tokens.ts` + componentes base em `src/components/ui/`.
 
+## Conectando ao Supabase (catálogo real pro scanner)
+
+O catálogo de produtos **já busca no Supabase de verdade** quando configurado — não precisa mudar código, só configurar:
+
+1. Crie um projeto grátis em [supabase.com](https://supabase.com).
+2. No **SQL Editor**, rode o arquivo [`SCHEMA.sql`](./SCHEMA.sql) inteiro (cria as tabelas, ativa RLS com leitura pública só em `products`/`promotions`/`member_promotions`/`stores`, e já popula com os mesmos produtos do mock).
+3. Em **Project Settings → API**, copie a `Project URL` e a chave `anon public`.
+4. Copie `.env.example` para `.env` na raiz do projeto e preencha:
+   ```
+   EXPO_PUBLIC_SUPABASE_URL=https://seu-projeto.supabase.co
+   EXPO_PUBLIC_SUPABASE_ANON_KEY=sua-chave-anon
+   ```
+5. Reinicie o `npx expo start` (ou gere um novo build) — o scanner (`src/services/catalog.ts`) passa a consultar `products`/`promotions` no Supabase a cada bipagem. Se a tabela não tiver aquele código de barras, aparece "Produto não cadastrado" (mesmo comportamento de antes).
+
+Pra testar com dados seus: edite a tabela `products` direto no **Table Editor** do Supabase (adicionar/mudar preço/criar promoção) e gere uma imagem de código de barras com o mesmo número em qualquer gerador de EAN-13 online.
+
+Sem o `.env` configurado, o app continua funcionando normalmente com o catálogo local mock — nada quebra.
+
+**Importante pro build com EAS:** o `.env` local só vale pra rodar com `npx expo start`. Pra essas variáveis irem também no `.apk` gerado pelo `eas build`, configure-as como variáveis de ambiente do projeto na EAS (`eas env:create` ou pelo site expo.dev → seu projeto → Environment variables, marcando visibilidade "Plain text" para o perfil `preview`) — senão o app buildado cai no catálogo mock mesmo com o Supabase configurado localmente.
+
 ## O que é mock (pilot) e precisa de integração real
 
-- **Catálogo de produtos/promoções**: `src/data/products.ts` (~15 produtos fictícios). Ponto de integração: função `findProductByBarcode`.
-- **Ofertas exclusivas de cliente**: `src/data/memberPromotions.ts`. Ponto de integração: `findMemberPromotionsByBarcode`.
-- **Login/usuários**: `src/data/users.ts` + `src/context/AuthContext.tsx` (senha em texto puro só porque é mock — isso NUNCA pode ir pra produção assim). Ponto de integração: a função `login()` dentro de `AuthContext.tsx` — troque a busca local por uma chamada à API de autenticação do supermercado.
-
-Em todos os casos, troque a busca local por uma chamada HTTP ao backend do supermercado mantendo o mesmo formato de retorno (ver tipos em `src/types.ts`), e o resto do app (carrinho, promoções, telas) continua funcionando sem mudanças.
+- **Catálogo de produtos/promoções gerais**: já pode vir do Supabase (ver acima). Sem Supabase configurado, usa `src/data/products.ts`.
+- **Ofertas exclusivas de cliente**: `src/data/memberPromotions.ts` — ainda não migrado pro Supabase (próximo passo natural: mesma mecânica do catálogo).
+- **Login/usuários**: `src/data/users.ts` + `src/context/AuthContext.tsx` (senha em texto puro só porque é mock — isso NUNCA pode ir pra produção assim). Ponto de integração: a função `login()` dentro de `AuthContext.tsx`.
 
 ## Banco de dados (schema esperado)
 
-O arquivo **[`SCHEMA.sql`](./SCHEMA.sql)** na raiz do projeto tem o schema completo em PostgreSQL, com dados de teste já populados (os mesmos produtos/usuários/promoções do mock). Rode ele inteiro num banco Postgres vazio — por exemplo criando um projeto grátis no [Supabase](https://supabase.com) e colando no SQL Editor — pra já ter algo pra testar.
+O arquivo **[`SCHEMA.sql`](./SCHEMA.sql)** na raiz do projeto tem o schema completo em PostgreSQL. As tabelas `products`, `promotions`, `member_promotions` e `stores` têm RLS com leitura pública (é o que o app consulta direto); as demais (`users`, `cart_sessions`, etc.) ficam com RLS ativo e sem política pública — só serão acessadas por uma API própria no futuro, nunca direto do app.
 
 Tabelas principais:
 
@@ -121,7 +140,7 @@ Ambos passam limpos nesta versão. Também validei que o bundle JS compila corre
 
 ## Próximos passos sugeridos
 
-- Trocar catálogo, promoções e login mock por chamadas à API real do supermercado (ver `SCHEMA.sql`).
+- Migrar ofertas de cliente (`memberPromotions.ts`) e login (`users.ts`) pro Supabase igual ao catálogo — login precisa passar por uma função/API própria (nunca comparar senha direto do app), não só uma query de leitura.
 - Hash de senha de verdade (bcrypt/argon2) e token de sessão (JWT) em vez do mock atual.
 - Sincronizar `cart_sessions`/`cart_items` com o backend (histórico de compras, cruzar com o caixa). Hoje **listas, histórico, favoritos e orçamento vivem só no `AsyncStorage` do aparelho** — não sincronizam entre dispositivos nem sobrevivem a reinstalar o app. Se precisar disso, essas 4 entidades também viram tabelas (`shopping_lists`, `shopping_list_items`, `favorites`, `user_budget`) ligadas a `users.id`.
 - Imagens de produto: o catálogo mock não tem URLs de imagem, então o carrinho hoje não mostra foto do produto (a UI já está pronta para receber `product.imageUrl` quando o catálogo real tiver isso).

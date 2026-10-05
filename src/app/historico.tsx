@@ -14,13 +14,17 @@ export default function HistoryScreen() {
   const { purchases } = useHistory();
   const { addByBarcode } = useCart();
   const [selected, setSelected] = useState<Purchase | null>(null);
+  const [isBuyingAgain, setIsBuyingAgain] = useState(false);
 
-  const handleBuyAgain = (purchase: Purchase) => {
-    purchase.items.forEach((item) => {
+  const handleBuyAgain = async (purchase: Purchase) => {
+    setIsBuyingAgain(true);
+    for (const item of purchase.items) {
       for (let i = 0; i < item.quantity; i += 1) {
-        addByBarcode(item.product.barcode);
+         
+        await addByBarcode(item.product.barcode);
       }
-    });
+    }
+    setIsBuyingAgain(false);
     Alert.alert(
       'Itens adicionados',
       `${purchase.items.length} produto(s) dessa compra foram adicionados ao seu carrinho atual, com os preços de hoje.`,
@@ -77,7 +81,12 @@ export default function HistoryScreen() {
         </ScrollView>
 
         <View style={styles.footer}>
-          <Button label="Comprar novamente" onPress={() => handleBuyAgain(selected)} fullWidth />
+          <Button
+            label="Comprar novamente"
+            onPress={() => handleBuyAgain(selected)}
+            loading={isBuyingAgain}
+            fullWidth
+          />
         </View>
       </View>
     );

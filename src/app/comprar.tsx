@@ -16,7 +16,8 @@ const SCAN_COOLDOWN_MS = 1200;
 const BUDGET_WARNING_THRESHOLD = 0.9;
 
 type Feedback =
-  | { type: 'added'; barcode: string; name: string; price: string; fromList?: string }
+  | { type: 'checking' }
+  | { type: 'added'; barcode: string; name: string; price: string; fromList?: string; offline?: boolean }
   | { type: 'not_found'; barcode: string };
 
 export default function ComprarScreen() {
@@ -43,11 +44,13 @@ export default function ComprarScreen() {
   }, []);
 
   const handleScanned = useCallback(
-    (result: BarcodeScanningResult) => {
+    async (result: BarcodeScanningResult) => {
       if (lockRef.current) return;
       lockRef.current = true;
+      setFeedback({ type: 'checking' });
 
-      const outcome = addByBarcode(result.data);
+      const outcome = await addByBarcode(result.data);
+
       if (outcome.status === 'added') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         const listMatch = markBoughtByBarcode(result.data);
@@ -57,6 +60,7 @@ export default function ComprarScreen() {
           name: outcome.product.name,
           price: formatBRL(outcome.product.price),
           fromList: listMatch?.listName,
+          offline: outcome.source === 'mock',
         });
       } else {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
@@ -121,7 +125,9 @@ export default function ComprarScreen() {
         <View
           style={[styles.feedbackBanner, feedback.type === 'not_found' && styles.feedbackBannerError]}
         >
-          {feedback.type === 'added' ? (
+          {feedback.type === 'checking' ? (
+            <Text style={styles.feedbackTitle}>Verificando produto…</Text>
+          ) : feedback.type === 'added' ? (
             <>
               <Text style={styles.feedbackTitle}>✓ Produto adicionado</Text>
               <Text style={styles.feedbackName}>{feedback.name}</Text>
@@ -133,6 +139,9 @@ export default function ComprarScreen() {
               </View>
               {feedback.fromList ? (
                 <Text style={styles.feedbackListMatch}>✓ Item da sua lista</Text>
+              ) : null}
+              {feedback.offline ? (
+                <Text style={styles.feedbackOffline}>⚠ Catálogo local (sem conexão com o servidor)</Text>
               ) : null}
             </>
           ) : (
@@ -234,6 +243,7 @@ const styles = StyleSheet.create({
   feedbackPrice: { color: '#fff', ...typography.bodyStrong },
   feedbackUndo: { color: '#fff', ...typography.caption, textDecorationLine: 'underline' },
   feedbackListMatch: { color: '#fff', ...typography.small, marginTop: spacing.xs, fontWeight: '700' },
+  feedbackOffline: { color: '#fff', ...typography.small, marginTop: spacing.xs, opacity: 0.85 },
   totalBar: {
     backgroundColor: colors.surface,
     paddingVertical: spacing.lg,

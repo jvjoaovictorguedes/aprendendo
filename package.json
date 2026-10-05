@@ -5,6 +5,7 @@
   "dependencies": {
     "@expo/metro-runtime": "^57.0.16",
     "@react-native-async-storage/async-storage": "^3.1.1",
+    "@supabase/supabase-js": "^2.117.2",
     "expo": "~57.0.26",
     "expo-camera": "^57.0.6",
     "expo-constants": "^57.0.20",
@@ -17,7 +18,8 @@
     "react-native": "0.86.3",
     "react-native-gesture-handler": "^3.3.0",
     "react-native-safe-area-context": "^5.10.1",
-    "react-native-screens": "^4.28.0"
+    "react-native-screens": "^4.28.0",
+    "react-native-url-polyfill": "^4.0.0"
   },
   "overrides": {
     "react-dom": "19.2.3"

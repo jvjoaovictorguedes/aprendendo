@@ -154,3 +154,35 @@ insert into member_promotions (product_barcode, label, extra_percent_off) values
 insert into users (name, cpf, password_hash, points) values
   ('João Victor', '12345678900', '123456', 480),
   ('Maria Souza', '98765432100', '123456', 1250);
+
+-- ============================================================
+-- Row Level Security — o app (chave "anon") só precisa LER
+-- produtos e promoções pra funcionar o scanner. As outras
+-- tabelas ficam com RLS ativo e sem política pública = ninguém
+-- lê/escreve direto do app (login, carrinho, etc. continuam
+-- mock no app até existir uma API própria por trás de auth real).
+-- ============================================================
+alter table products enable row level security;
+alter table promotions enable row level security;
+alter table member_promotions enable row level security;
+alter table stores enable row level security;
+alter table users enable row level security;
+alter table user_activated_promotions enable row level security;
+alter table cart_sessions enable row level security;
+alter table cart_items enable row level security;
+
+create policy "Qualquer um pode ler produtos ativos"
+  on products for select
+  using (active = true);
+
+create policy "Qualquer um pode ler promoções ativas"
+  on promotions for select
+  using (active = true);
+
+create policy "Qualquer um pode ler ofertas de cliente ativas"
+  on member_promotions for select
+  using (active = true);
+
+create policy "Qualquer um pode ler lojas"
+  on stores for select
+  using (true);

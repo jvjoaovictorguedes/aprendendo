@@ -9,16 +9,18 @@ import {
   useState,
 } from 'react';
 
-import { findProductByBarcode } from '../data/products';
+import { fetchProductByBarcode, CatalogSource } from '../services/catalog';
 import { CartItem, Product } from '../types';
 
 const STORAGE_KEY = 'scanmercado:cart:v1';
 
-type AddResult = { status: 'added'; product: Product } | { status: 'not_found'; barcode: string };
+type AddResult =
+  | { status: 'added'; product: Product; source: CatalogSource }
+  | { status: 'not_found'; barcode: string };
 
 type CartContextValue = {
   items: CartItem[];
-  addByBarcode: (barcode: string) => AddResult;
+  addByBarcode: (barcode: string) => Promise<AddResult>;
   incrementItem: (barcode: string) => void;
   decrementItem: (barcode: string) => void;
   removeItem: (barcode: string) => void;
@@ -44,8 +46,8 @@ export function CartProvider({ children }: PropsWithChildren) {
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(items)).catch(() => {});
   }, [items, isLoaded]);
 
-  const addByBarcode = useCallback((barcode: string): AddResult => {
-    const product = findProductByBarcode(barcode);
+  const addByBarcode = useCallback(async (barcode: string): Promise<AddResult> => {
+    const { product, source } = await fetchProductByBarcode(barcode);
     if (!product) {
       return { status: 'not_found', barcode };
     }
@@ -60,7 +62,7 @@ export function CartProvider({ children }: PropsWithChildren) {
       return [...current, { product, quantity: 1 }];
     });
 
-    return { status: 'added', product };
+    return { status: 'added', product, source };
   }, []);
 
   const incrementItem = useCallback((barcode: string) => {
