@@ -18,7 +18,7 @@ const BUDGET_WARNING_THRESHOLD = 0.9;
 type Feedback =
   | { type: 'checking' }
   | { type: 'added'; barcode: string; name: string; price: string; fromList?: string; offline?: boolean }
-  | { type: 'not_found'; barcode: string };
+  | { type: 'not_found'; barcode: string; offline?: boolean };
 
 export default function ComprarScreen() {
   const router = useRouter();
@@ -64,7 +64,11 @@ export default function ComprarScreen() {
         });
       } else {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
-        setFeedback({ type: 'not_found', barcode: outcome.barcode });
+        setFeedback({
+          type: 'not_found',
+          barcode: outcome.barcode,
+          offline: outcome.source === 'mock',
+        });
       }
 
       clearFeedbackLater();
@@ -145,7 +149,14 @@ export default function ComprarScreen() {
               ) : null}
             </>
           ) : (
-            <Text style={styles.feedbackTitle}>Produto não cadastrado ({feedback.barcode})</Text>
+            <>
+              <Text style={styles.feedbackTitle}>Produto não cadastrado ({feedback.barcode})</Text>
+              <Text style={styles.feedbackOffline}>
+                {feedback.offline
+                  ? '⚠ Buscado no catálogo local — Supabase não conectado'
+                  : '✓ Verificado no Supabase, código não existe na tabela products'}
+              </Text>
+            </>
           )}
         </View>
       ) : (

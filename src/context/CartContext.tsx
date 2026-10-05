@@ -16,7 +16,7 @@ const STORAGE_KEY = 'scanmercado:cart:v1';
 
 type AddResult =
   | { status: 'added'; product: Product; source: CatalogSource }
-  | { status: 'not_found'; barcode: string };
+  | { status: 'not_found'; barcode: string; source: CatalogSource };
 
 type CartContextValue = {
   items: CartItem[];
@@ -49,7 +49,7 @@ export function CartProvider({ children }: PropsWithChildren) {
   const addByBarcode = useCallback(async (barcode: string): Promise<AddResult> => {
     const { product, source } = await fetchProductByBarcode(barcode);
     if (!product) {
-      return { status: 'not_found', barcode };
+      return { status: 'not_found', barcode, source };
     }
 
     setItems((current) => {
