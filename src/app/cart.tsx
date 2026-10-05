@@ -1,15 +1,21 @@
 import { useRouter } from 'expo-router';
-import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 
 import { ProductRow } from '../components/ProductRow';
+import { Button, EmptyState } from '../components/ui';
 import { useCart } from '../context/CartContext';
+import { useFavorites } from '../context/FavoritesContext';
+import { useHistory } from '../context/HistoryContext';
 import { usePromotions } from '../context/PromotionsContext';
+import { colors, spacing, typography } from '../theme/tokens';
 import { computeCartTotals, formatBRL } from '../utils/pricing';
 
 export default function CartScreen() {
   const router = useRouter();
   const { items, incrementItem, decrementItem, removeItem, clearCart } = useCart();
   const { extraPercentOffFor } = usePromotions();
+  const { isFavorite, toggleFavorite } = useFavorites();
+  const { addPurchase } = useHistory();
   const totals = computeCartTotals(items, extraPercentOffFor);
 
   const confirmClear = () => {
@@ -19,23 +25,38 @@ export default function CartScreen() {
     ]);
   };
 
-  const showCheckoutNotice = () => {
+  const handleCheckout = () => {
     Alert.alert(
-      'Prévia do pagamento',
-      'Este valor é uma estimativa com base nos itens escaneados. Confirme o total e as promoções no caixa antes de pagar.',
-      [{ text: 'Entendi' }],
+      'Finalizar compra',
+      'Isso arquiva a compra no seu histórico e esvazia o carrinho. O pagamento continua sendo feito no caixa — este é só o resumo do que você escaneou.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Finalizar',
+          onPress: () => {
+            addPurchase(items, {
+              originalTotal: totals.originalTotal,
+              finalTotal: totals.finalTotal,
+              savings: totals.savings,
+            });
+            clearCart();
+            router.push('/historico');
+          },
+        },
+      ],
     );
   };
 
   if (items.length === 0) {
     return (
       <View style={styles.empty}>
-        <Text style={styles.emptyEmoji}>🛒</Text>
-        <Text style={styles.emptyTitle}>Seu carrinho está vazio</Text>
-        <Text style={styles.emptySubtitle}>Vá até o Scanner e bipe o primeiro produto.</Text>
-        <TouchableOpacity style={styles.primaryButton} onPress={() => router.push('/')}>
-          <Text style={styles.primaryButtonText}>Ir para o Scanner</Text>
-        </TouchableOpacity>
+        <EmptyState
+          emoji="🛒"
+          title="Seu carrinho está vazio"
+          subtitle="Vá até Comprar e bipe o primeiro produto."
+          actionLabel="Ir para Comprar"
+          onAction={() => router.push('/comprar')}
+        />
       </View>
     );
   }
@@ -49,12 +70,14 @@ export default function CartScreen() {
           <ProductRow
             item={item}
             extraPercentOff={extraPercentOffFor(item.product.barcode)}
+            isFavorite={isFavorite(item.product.barcode)}
+            onToggleFavorite={() => toggleFavorite(item.product.barcode)}
             onIncrement={() => incrementItem(item.product.barcode)}
             onDecrement={() => decrementItem(item.product.barcode)}
             onRemove={() => removeItem(item.product.barcode)}
           />
         )}
-        contentContainerStyle={{ paddingBottom: 12 }}
+        contentContainerStyle={{ paddingBottom: spacing.md }}
       />
 
       <View style={styles.summary}>
@@ -64,7 +87,7 @@ export default function CartScreen() {
         </View>
         {totals.savings > 0 ? (
           <View style={styles.summaryRow}>
-            <Text style={[styles.summaryLabel, styles.savingsLabel]}>Economia com promoções</Text>
+            <Text style={[styles.summaryLabel, styles.savingsLabel]}>Descontos</Text>
             <Text style={styles.savingsLabel}>- {formatBRL(totals.savings)}</Text>
           </View>
         ) : null}
@@ -74,13 +97,20 @@ export default function CartScreen() {
         </View>
 
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.secondaryButton} onPress={confirmClear}>
-            <Text style={styles.secondaryButtonText}>Limpar</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.primaryButton} onPress={showCheckoutNotice}>
-            <Text style={styles.primaryButtonText}>Prévia do pagamento</Text>
-          </TouchableOpacity>
+          <Button label="Limpar" variant="danger" onPress={confirmClear} />
+          <Button
+            label="Continuar comprando"
+            variant="secondary"
+            onPress={() => router.push('/comprar')}
+            style={{ flex: 1 }}
+          />
         </View>
+        <Button
+          label="Finalizar compra"
+          onPress={handleCheckout}
+          fullWidth
+          style={{ marginTop: spacing.sm }}
+        />
         <Text style={styles.disclaimer}>
           Este app não substitui o caixa. Valores finais podem variar conforme validação no PDV.
         </Text>
@@ -90,48 +120,32 @@ export default function CartScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  empty: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    backgroundColor: '#fff',
-  },
-  emptyEmoji: { fontSize: 48, marginBottom: 12 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#1A1A1A' },
-  emptySubtitle: { fontSize: 14, color: '#777', marginTop: 6, marginBottom: 20, textAlign: 'center' },
+  container: { flex: 1, backgroundColor: colors.surface },
+  empty: { flex: 1, justifyContent: 'center', backgroundColor: colors.surface },
   summary: {
     borderTopWidth: 1,
-    borderTopColor: '#EEE',
-    padding: 16,
-    paddingBottom: 24,
-    gap: 6,
+    borderTopColor: colors.border,
+    padding: spacing.lg,
+    paddingBottom: spacing.xl,
+    gap: spacing.xs,
   },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  summaryLabel: { fontSize: 14, color: '#555' },
-  summaryValue: { fontSize: 14, color: '#555' },
-  savingsLabel: { fontSize: 13, color: '#1DB954', fontWeight: '600' },
-  totalRow: { marginTop: 4, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#EEE' },
-  totalLabel: { fontSize: 16, fontWeight: '700', color: '#1A1A1A' },
-  totalValue: { fontSize: 22, fontWeight: '800', color: '#1A1A1A' },
-  actions: { flexDirection: 'row', gap: 10, marginTop: 12 },
-  primaryButton: {
-    flex: 1,
-    backgroundColor: '#1DB954',
-    paddingVertical: 14,
-    borderRadius: 24,
-    alignItems: 'center',
+  summaryLabel: { ...typography.body, color: colors.textMuted },
+  summaryValue: { ...typography.body, color: colors.textMuted },
+  savingsLabel: { ...typography.caption, color: colors.brand, fontWeight: '600' },
+  totalRow: {
+    marginTop: spacing.xs,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
-  primaryButtonText: { color: '#fff', fontWeight: '700' },
-  secondaryButton: {
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#C0392B',
-    alignItems: 'center',
+  totalLabel: { ...typography.h2, color: colors.text },
+  totalValue: { ...typography.display, color: colors.text },
+  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  disclaimer: {
+    ...typography.small,
+    color: colors.textFaint,
+    marginTop: spacing.sm,
+    textAlign: 'center',
   },
-  secondaryButtonText: { color: '#C0392B', fontWeight: '700' },
-  disclaimer: { fontSize: 11, color: '#999', marginTop: 10, textAlign: 'center' },
 });

@@ -3,17 +3,62 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 
+import { Button, Card } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
+import { useBudget } from '../context/BudgetContext';
+import { colors, radius, spacing, typography } from '../theme/tokens';
+import { formatBRL } from '../utils/pricing';
 
 function formatCpfInput(value: string): string {
   return value.replace(/\D/g, '').slice(0, 11);
+}
+
+function BudgetSection() {
+  const { limit, setLimit } = useBudget();
+  const [draft, setDraft] = useState(limit != null ? String(limit) : '');
+
+  const handleSave = () => {
+    const parsed = Number(draft.replace(',', '.'));
+    if (draft.trim() === '') {
+      setLimit(null);
+      return;
+    }
+    if (Number.isNaN(parsed) || parsed <= 0) {
+      Alert.alert('Valor inválido', 'Digite um valor válido para o orçamento.');
+      return;
+    }
+    setLimit(parsed);
+  };
+
+  return (
+    <Card style={{ marginTop: spacing.xl }}>
+      <Text style={styles.sectionTitle}>Orçamento da compra</Text>
+      <Text style={styles.sectionSubtitle}>
+        Defina um limite e acompanhe quanto resta enquanto bipa os produtos.
+      </Text>
+      <View style={styles.budgetRow}>
+        <Text style={styles.budgetPrefix}>R$</Text>
+        <TextInput
+          style={styles.budgetInput}
+          placeholder="0,00"
+          keyboardType="decimal-pad"
+          value={draft}
+          onChangeText={setDraft}
+        />
+        <Button label="Salvar" onPress={handleSave} />
+      </View>
+      {limit != null ? (
+        <Text style={styles.budgetCurrent}>Limite atual: {formatBRL(limit)}</Text>
+      ) : null}
+    </Card>
+  );
 }
 
 export default function ProfileScreen() {
@@ -24,22 +69,30 @@ export default function ProfileScreen() {
 
   if (user) {
     return (
-      <View style={styles.loggedContainer}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{user.name.charAt(0)}</Text>
-        </View>
-        <Text style={styles.name}>{user.name}</Text>
-        <Text style={styles.cpf}>CPF: {user.cpf}</Text>
+      <ScrollView style={styles.container} contentContainerStyle={{ padding: spacing.xl }}>
+        <View style={styles.loggedHeader}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{user.name.charAt(0)}</Text>
+          </View>
+          <Text style={styles.name}>{user.name}</Text>
+          <Text style={styles.cpf}>CPF: {user.cpf}</Text>
 
-        <View style={styles.pointsCard}>
-          <Text style={styles.pointsLabel}>Pontos de fidelidade</Text>
-          <Text style={styles.pointsValue}>{user.points} pts</Text>
+          <Card style={styles.pointsCard}>
+            <Text style={styles.pointsLabel}>Pontos de fidelidade</Text>
+            <Text style={styles.pointsValue}>{user.points} pts</Text>
+          </Card>
         </View>
 
-        <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-          <Text style={styles.logoutButtonText}>Sair da conta</Text>
-        </TouchableOpacity>
-      </View>
+        <BudgetSection />
+
+        <Button
+          label="Sair da conta"
+          variant="danger"
+          onPress={logout}
+          fullWidth
+          style={{ marginTop: spacing.xl }}
+        />
+      </ScrollView>
     );
   }
 
@@ -62,97 +115,92 @@ export default function ProfileScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <Text style={styles.title}>Entrar</Text>
-      <Text style={styles.subtitle}>
-        Faça login para acumular pontos e ativar ofertas exclusivas.
-      </Text>
+      <ScrollView contentContainerStyle={{ padding: spacing.xl, flexGrow: 1, justifyContent: 'center' }}>
+        <Text style={styles.title}>Entrar</Text>
+        <Text style={styles.subtitle}>
+          Faça login para acumular pontos e ativar ofertas exclusivas.
+        </Text>
 
-      <Text style={styles.label}>CPF</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Somente números"
-        keyboardType="numeric"
-        maxLength={11}
-        value={cpf}
-        onChangeText={(value) => setCpf(formatCpfInput(value))}
-      />
+        <Text style={styles.label}>CPF</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Somente números"
+          keyboardType="numeric"
+          maxLength={11}
+          value={cpf}
+          onChangeText={(value) => setCpf(formatCpfInput(value))}
+          accessibilityLabel="CPF"
+        />
 
-      <Text style={styles.label}>Senha</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="••••••"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
+        <Text style={styles.label}>Senha</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="••••••"
+          secureTextEntry
+          value={password}
+          onChangeText={setPassword}
+          accessibilityLabel="Senha"
+        />
 
-      <TouchableOpacity
-        style={[styles.loginButton, isSubmitting && { opacity: 0.6 }]}
-        onPress={handleLogin}
-        disabled={isSubmitting}
-      >
-        <Text style={styles.loginButtonText}>{isSubmitting ? 'Entrando...' : 'Entrar'}</Text>
-      </TouchableOpacity>
+        <Button
+          label={isSubmitting ? 'Entrando...' : 'Entrar'}
+          onPress={handleLogin}
+          loading={isSubmitting}
+          fullWidth
+          style={{ marginTop: spacing.xl }}
+        />
 
-      <Text style={styles.demoHint}>
-        Login de teste: CPF 12345678900, senha 123456
-      </Text>
+        <Text style={styles.demoHint}>Login de teste: CPF 12345678900, senha 123456</Text>
+
+        <BudgetSection />
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', padding: 24, justifyContent: 'center' },
-  title: { fontSize: 22, fontWeight: '800', color: '#1A1A1A' },
-  subtitle: { fontSize: 14, color: '#777', marginTop: 6, marginBottom: 24 },
-  label: { fontSize: 13, fontWeight: '600', color: '#555', marginBottom: 6, marginTop: 12 },
+  container: { flex: 1, backgroundColor: colors.surfaceAlt },
+  title: { ...typography.h1, color: colors.text },
+  subtitle: { ...typography.body, color: colors.textMuted, marginTop: spacing.xs, marginBottom: spacing.sm },
+  label: { ...typography.small, fontWeight: '700', color: colors.textMuted, marginBottom: 6, marginTop: spacing.md },
   input: {
     borderWidth: 1,
-    borderColor: '#DDD',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    ...typography.body,
+    backgroundColor: colors.surface,
   },
-  loginButton: {
-    backgroundColor: '#1DB954',
-    borderRadius: 24,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 24,
-  },
-  loginButtonText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  demoHint: { fontSize: 12, color: '#999', textAlign: 'center', marginTop: 16 },
-  loggedContainer: { flex: 1, backgroundColor: '#fff', alignItems: 'center', padding: 24, paddingTop: 48 },
+  demoHint: { ...typography.small, color: colors.textFaint, textAlign: 'center', marginTop: spacing.lg },
+  loggedHeader: { alignItems: 'center' },
   avatar: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: '#1DB954',
+    backgroundColor: colors.brand,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   avatarText: { color: '#fff', fontSize: 28, fontWeight: '700' },
-  name: { fontSize: 19, fontWeight: '700', color: '#1A1A1A' },
-  cpf: { fontSize: 13, color: '#777', marginTop: 4 },
-  pointsCard: {
-    marginTop: 24,
-    backgroundColor: '#F3F3F3',
-    borderRadius: 16,
-    paddingVertical: 20,
-    paddingHorizontal: 32,
-    alignItems: 'center',
-  },
-  pointsLabel: { fontSize: 13, color: '#777' },
-  pointsValue: { fontSize: 28, fontWeight: '800', color: '#1DB954', marginTop: 4 },
-  logoutButton: {
-    marginTop: 32,
+  name: { ...typography.h2, color: colors.text },
+  cpf: { ...typography.caption, color: colors.textMuted, marginTop: 4 },
+  pointsCard: { marginTop: spacing.xl, alignItems: 'center', alignSelf: 'stretch' },
+  pointsLabel: { ...typography.caption, color: colors.textMuted },
+  pointsValue: { ...typography.display, color: colors.brand, marginTop: 4 },
+  sectionTitle: { ...typography.h2, color: colors.text },
+  sectionSubtitle: { ...typography.caption, color: colors.textMuted, marginTop: 2, marginBottom: spacing.md },
+  budgetRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  budgetPrefix: { ...typography.bodyStrong, color: colors.textMuted },
+  budgetInput: {
+    flex: 1,
     borderWidth: 1,
-    borderColor: '#C0392B',
-    borderRadius: 24,
-    paddingVertical: 12,
-    paddingHorizontal: 32,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    ...typography.body,
   },
-  logoutButtonText: { color: '#C0392B', fontWeight: '700' },
+  budgetCurrent: { ...typography.caption, color: colors.brandDark, marginTop: spacing.sm, fontWeight: '600' },
 });

@@ -1,172 +1,197 @@
 import { useRouter } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { Badge, Button, Card, Section } from '../components/ui';
+import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import { useHistory } from '../context/HistoryContext';
+import { useLists } from '../context/ListsContext';
 import { usePromotions } from '../context/PromotionsContext';
+import { MEMBER_PROMOTIONS } from '../data/memberPromotions';
+import { MOCK_PRODUCTS } from '../data/products';
+import { colors, radius, spacing, typography } from '../theme/tokens';
 import { computeCartTotals, formatBRL } from '../utils/pricing';
 
-const SCAN_COOLDOWN_MS = 1500;
+const storeOffers = MOCK_PRODUCTS.filter((product) => product.promotion).slice(0, 3);
 
-type Feedback = { type: 'added'; name: string; price: string } | { type: 'not_found'; barcode: string };
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Bom dia';
+  if (hour < 18) return 'Boa tarde';
+  return 'Boa noite';
+}
 
-export default function ScannerScreen() {
+export default function HomeScreen() {
   const router = useRouter();
-  const [permission, requestPermission] = useCameraPermissions();
-  const { items, addByBarcode } = useCart();
+  const { user } = useAuth();
+  const { items } = useCart();
   const { extraPercentOffFor } = usePromotions();
-  const [feedback, setFeedback] = useState<Feedback | null>(null);
-  const lockRef = useRef(false);
+  const { lists } = useLists();
+  const { purchases } = useHistory();
 
   const totals = computeCartTotals(items, extraPercentOffFor);
-
-  const handleScanned = useCallback(
-    (result: BarcodeScanningResult) => {
-      if (lockRef.current) return;
-      lockRef.current = true;
-
-      const outcome = addByBarcode(result.data);
-      if (outcome.status === 'added') {
-        setFeedback({
-          type: 'added',
-          name: outcome.product.name,
-          price: formatBRL(outcome.product.price),
-        });
-      } else {
-        setFeedback({ type: 'not_found', barcode: outcome.barcode });
-      }
-
-      setTimeout(() => {
-        lockRef.current = false;
-        setFeedback(null);
-      }, SCAN_COOLDOWN_MS);
-    },
-    [addByBarcode],
-  );
-
-  if (!permission) {
-    return <View style={styles.center} />;
-  }
-
-  if (!permission.granted) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.permissionText}>
-          Para bipar os produtos, o ScanMercado precisa acessar a câmera do seu celular.
-        </Text>
-        <TouchableOpacity style={styles.primaryButton} onPress={requestPermission}>
-          <Text style={styles.primaryButtonText}>Permitir acesso à câmera</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  const hasActiveCart = items.length > 0;
+  const recentLists = lists.slice(0, 2);
+  const recentPurchase = purchases[0];
+  const availableMemberOffers = MEMBER_PROMOTIONS.length;
 
   return (
-    <View style={styles.container}>
-      <CameraView
-        style={styles.camera}
-        facing="back"
-        onBarcodeScanned={handleScanned}
-        barcodeScannerSettings={{
-          barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128'],
-        }}
-      >
-        <View style={styles.scanFrame} />
-      </CameraView>
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
+      <View style={styles.header}>
+        <Text style={styles.greeting}>
+          {getGreeting()}{user ? `, ${user.name.split(' ')[0]}` : ''}
+        </Text>
+        <Text style={styles.store}>📍 ScanMercado — Loja Centro</Text>
+      </View>
 
-      {feedback ? (
-        <View
-          style={[
-            styles.feedbackBanner,
-            feedback.type === 'not_found' && styles.feedbackBannerError,
-          ]}
+      <View style={styles.ctaWrapper}>
+        <TouchableOpacity
+          style={styles.ctaButton}
+          onPress={() => router.push('/comprar')}
+          accessibilityRole="button"
+          accessibilityLabel="Começar compra"
         >
-          {feedback.type === 'added' ? (
-            <>
-              <Text style={styles.feedbackTitle}>✓ {feedback.name}</Text>
-              <Text style={styles.feedbackSubtitle}>{feedback.price} adicionado ao carrinho</Text>
-            </>
+          <Text style={styles.ctaEmoji}>📷</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.ctaTitle}>
+              {hasActiveCart ? 'Continuar comprando' : 'Começar compra'}
+            </Text>
+            <Text style={styles.ctaSubtitle}>Bipe os produtos e acompanhe o total</Text>
+          </View>
+          <Text style={styles.ctaArrow}>›</Text>
+        </TouchableOpacity>
+      </View>
+
+      {hasActiveCart ? (
+        <View style={styles.sectionPadding}>
+          <Card>
+            <View style={styles.cartRow}>
+              <View>
+                <Text style={styles.cartLabel}>Carrinho atual</Text>
+                <Text style={styles.cartItemCount}>{totals.itemCount} item(ns)</Text>
+              </View>
+              <Text style={styles.cartTotal}>{formatBRL(totals.finalTotal)}</Text>
+            </View>
+            <Button
+              label="Ver carrinho"
+              variant="secondary"
+              onPress={() => router.push('/cart')}
+              style={{ marginTop: spacing.md }}
+              fullWidth
+            />
+          </Card>
+        </View>
+      ) : null}
+
+      <Section title="Ofertas para você" actionLabel="Ver todas" onAction={() => router.push('/promotions')}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: spacing.md }}>
+          {storeOffers.map((product) => (
+            <Card key={product.barcode} style={styles.offerCard}>
+              <Badge label={product.promotion?.label ?? ''} variant="danger" />
+              <Text style={styles.offerName} numberOfLines={2}>
+                {product.name}
+              </Text>
+              <Text style={styles.offerPrice}>{formatBRL(product.price)}</Text>
+            </Card>
+          ))}
+          {availableMemberOffers > 0 ? (
+            <Card style={[styles.offerCard, { backgroundColor: colors.brandSoft }]}>
+              <Badge label="Exclusivo" variant="brand" />
+              <Text style={styles.offerName}>{availableMemberOffers} ofertas de cliente disponíveis</Text>
+              <Text style={styles.offerLink}>Ativar na aba Promoções</Text>
+            </Card>
+          ) : null}
+        </ScrollView>
+      </Section>
+
+      <Section title="Suas listas" actionLabel="Ver todas" onAction={() => router.push('/listas')}>
+        <View style={styles.sectionPadding}>
+          {recentLists.length === 0 ? (
+            <Card>
+              <Text style={styles.emptyHint}>Você ainda não tem listas de compras.</Text>
+              <Button
+                label="Criar lista"
+                variant="secondary"
+                onPress={() => router.push('/listas')}
+                style={{ marginTop: spacing.md }}
+              />
+            </Card>
           ) : (
-            <Text style={styles.feedbackTitle}>Produto não cadastrado ({feedback.barcode})</Text>
+            recentLists.map((list) => {
+              const boughtCount = list.items.filter((item) => item.bought).length;
+              return (
+                <TouchableOpacity key={list.id} onPress={() => router.push('/listas')}>
+                  <Card style={{ marginBottom: spacing.sm }}>
+                    <Text style={styles.listName}>{list.name}</Text>
+                    <Text style={styles.listProgress}>
+                      {boughtCount}/{list.items.length} itens comprados
+                    </Text>
+                  </Card>
+                </TouchableOpacity>
+              );
+            })
           )}
         </View>
-      ) : (
-        <View style={styles.hintBanner}>
-          <Text style={styles.hintText}>Aponte a câmera para o código de barras</Text>
-        </View>
-      )}
+      </Section>
 
-      <TouchableOpacity style={styles.totalBar} onPress={() => router.push('/cart')}>
-        <View>
-          <Text style={styles.totalBarLabel}>{totals.itemCount} item(ns) escaneado(s)</Text>
-          <Text style={styles.totalBarValue}>{formatBRL(totals.finalTotal)}</Text>
+      <Section title="Compras recentes" actionLabel="Ver tudo" onAction={() => router.push('/historico')}>
+        <View style={styles.sectionPadding}>
+          {recentPurchase ? (
+            <TouchableOpacity onPress={() => router.push('/historico')}>
+              <Card>
+                <View style={styles.cartRow}>
+                  <View>
+                    <Text style={styles.cartLabel}>
+                      {new Date(recentPurchase.date).toLocaleDateString('pt-BR')}
+                    </Text>
+                    <Text style={styles.cartItemCount}>
+                      {recentPurchase.items.length} produto(s)
+                    </Text>
+                  </View>
+                  <Text style={styles.cartTotal}>{formatBRL(recentPurchase.finalTotal)}</Text>
+                </View>
+              </Card>
+            </TouchableOpacity>
+          ) : (
+            <Card>
+              <Text style={styles.emptyHint}>Suas compras finalizadas aparecem aqui.</Text>
+            </Card>
+          )}
         </View>
-        <Text style={styles.totalBarAction}>Ver carrinho ›</Text>
-      </TouchableOpacity>
-    </View>
+      </Section>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
-  camera: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  scanFrame: {
-    width: 260,
-    height: 160,
-    borderWidth: 3,
-    borderColor: '#1DB954',
-    borderRadius: 16,
-    backgroundColor: 'transparent',
-  },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    backgroundColor: '#fff',
-  },
-  permissionText: { textAlign: 'center', fontSize: 15, color: '#333', marginBottom: 16 },
-  primaryButton: {
-    backgroundColor: '#1DB954',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 24,
-  },
-  primaryButtonText: { color: '#fff', fontWeight: '700' },
-  hintBanner: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
-    right: 16,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    borderRadius: 10,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  hintText: { color: '#fff', fontSize: 13 },
-  feedbackBanner: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
-    right: 16,
-    backgroundColor: '#1DB954',
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-  },
-  feedbackBannerError: { backgroundColor: '#C0392B' },
-  feedbackTitle: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  feedbackSubtitle: { color: '#fff', fontSize: 13, marginTop: 2 },
-  totalBar: {
-    backgroundColor: '#fff',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
+  container: { flex: 1, backgroundColor: colors.surfaceAlt },
+  header: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
+  greeting: { ...typography.h1, color: colors.text },
+  store: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+  ctaWrapper: { paddingHorizontal: spacing.lg, marginTop: spacing.lg },
+  ctaButton: {
+    backgroundColor: colors.brand,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: spacing.md,
   },
-  totalBarLabel: { fontSize: 12, color: '#777' },
-  totalBarValue: { fontSize: 20, fontWeight: '700', color: '#1A1A1A' },
-  totalBarAction: { fontSize: 14, color: '#1DB954', fontWeight: '600' },
+  ctaEmoji: { fontSize: 32 },
+  ctaTitle: { ...typography.h2, color: colors.onBrand },
+  ctaSubtitle: { ...typography.caption, color: colors.onBrand, opacity: 0.9, marginTop: 2 },
+  ctaArrow: { ...typography.display, color: colors.onBrand },
+  sectionPadding: { paddingHorizontal: spacing.lg },
+  cartRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  cartLabel: { ...typography.caption, color: colors.textMuted },
+  cartItemCount: { ...typography.bodyStrong, color: colors.text, marginTop: 2 },
+  cartTotal: { ...typography.h1, color: colors.text },
+  offerCard: { width: 160 },
+  offerName: { ...typography.bodyStrong, color: colors.text, marginTop: spacing.sm },
+  offerPrice: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+  offerLink: { ...typography.small, color: colors.brandDark, marginTop: 2, fontWeight: '700' },
+  listName: { ...typography.bodyStrong, color: colors.text },
+  listProgress: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+  emptyHint: { ...typography.body, color: colors.textMuted },
 });

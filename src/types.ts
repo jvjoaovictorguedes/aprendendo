@@ -16,3 +16,26 @@ export type CartItem = {
   product: Product;
   quantity: number;
 };
+
+export type Purchase = {
+  id: string;
+  date: string; // ISO
+  items: CartItem[];
+  originalTotal: number;
+  finalTotal: number;
+  savings: number;
+};
+
+export type ShoppingListItem = {
+  id: string;
+  name: string;
+  barcode?: string; // quando o item corresponde a um produto do catálogo
+  bought: boolean;
+};
+
+export type ShoppingList = {
+  id: string;
+  name: string;
+  createdAt: string; // ISO
+  items: ShoppingListItem[];
+};

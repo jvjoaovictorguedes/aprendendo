@@ -5,8 +5,13 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider } from '../context/AuthContext';
+import { BudgetProvider } from '../context/BudgetContext';
 import { CartProvider, useCart } from '../context/CartContext';
+import { FavoritesProvider } from '../context/FavoritesContext';
+import { HistoryProvider } from '../context/HistoryContext';
+import { ListsProvider } from '../context/ListsContext';
 import { PromotionsProvider } from '../context/PromotionsContext';
+import { colors } from '../theme/tokens';
 
 const TAB_ICON_SIZE = 24;
 
@@ -36,7 +41,7 @@ function CartBadge() {
         position: 'absolute',
         top: -4,
         right: -10,
-        backgroundColor: '#C0392B',
+        backgroundColor: colors.danger,
         minWidth: 16,
         height: 16,
         borderRadius: 8,
@@ -56,34 +61,42 @@ function RootNavigator() {
   return (
     <Tabs
       screenOptions={{
-        headerStyle: { backgroundColor: '#1DB954' },
+        headerStyle: { backgroundColor: colors.brand },
         headerTintColor: '#fff',
         headerTitleStyle: { fontWeight: '700' },
-        tabBarActiveTintColor: '#1DB954',
+        tabBarActiveTintColor: colors.brand,
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Scanner',
-          tabBarLabel: 'Escanear',
-          tabBarIcon: () => <TabIcon emoji="📷" />,
+          title: 'ScanMercado',
+          tabBarLabel: 'Home',
+          tabBarIcon: () => <TabIcon emoji="🏠" />,
         }}
       />
       <Tabs.Screen
-        name="promotions"
+        name="comprar"
         options={{
-          title: 'Promoções',
-          tabBarLabel: 'Promoções',
-          tabBarIcon: () => <TabIcon emoji="🏷" />,
+          title: 'Comprar',
+          tabBarLabel: 'Comprar',
+          tabBarIcon: () => <TabIcon emoji="📷" showBadge />,
         }}
       />
       <Tabs.Screen
-        name="cart"
+        name="listas"
         options={{
-          title: 'Meu Carrinho',
-          tabBarLabel: 'Carrinho',
-          tabBarIcon: () => <TabIcon emoji="🛒" showBadge />,
+          title: 'Minhas Listas',
+          tabBarLabel: 'Listas',
+          tabBarIcon: () => <TabIcon emoji="📝" />,
+        }}
+      />
+      <Tabs.Screen
+        name="historico"
+        options={{
+          title: 'Histórico',
+          tabBarLabel: 'Histórico',
+          tabBarIcon: () => <TabIcon emoji="🧾" />,
         }}
       />
       <Tabs.Screen
@@ -94,6 +107,9 @@ function RootNavigator() {
           tabBarIcon: () => <TabIcon emoji="👤" />,
         }}
       />
+      {/* Rotas acessíveis por navegação, mas fora da barra de abas */}
+      <Tabs.Screen name="cart" options={{ title: 'Meu Carrinho', href: null }} />
+      <Tabs.Screen name="promotions" options={{ title: 'Promoções', href: null }} />
     </Tabs>
   );
 }
@@ -105,8 +121,16 @@ export default function Layout() {
         <AuthProvider>
           <CartProvider>
             <PromotionsProvider>
-              <StatusBar style="light" />
-              <RootNavigator />
+              <ListsProvider>
+                <HistoryProvider>
+                  <BudgetProvider>
+                    <FavoritesProvider>
+                      <StatusBar style="light" />
+                      <RootNavigator />
+                    </FavoritesProvider>
+                  </BudgetProvider>
+                </HistoryProvider>
+              </ListsProvider>
             </PromotionsProvider>
           </CartProvider>
         </AuthProvider>

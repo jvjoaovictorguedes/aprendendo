@@ -115,6 +115,12 @@ export const MOCK_PRODUCTS: Product[] = [
   },
 ];
 
+export function findProductByName(name: string): Product | undefined {
+  const normalized = name.trim().toLowerCase();
+  if (!normalized) return undefined;
+  return MOCK_PRODUCTS.find((product) => product.name.toLowerCase().includes(normalized));
+}
+
 export function findProductByBarcode(barcode: string): Product | undefined {
   return MOCK_PRODUCTS.find((product) => product.barcode === barcode);
 }

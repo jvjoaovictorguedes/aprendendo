@@ -6,14 +6,23 @@ App mobile (Expo / React Native) para clientes de supermercado. O cliente **bipa
 
 ## O que já funciona
 
-- Leitura de código de barras (EAN-13, EAN-8, UPC-A, UPC-E, Code128) pela câmera, usando `expo-camera`.
+**Scan & Go (núcleo do app):**
+- Leitura de código de barras (EAN-13, EAN-8, UPC-A, UPC-E, Code128) pela câmera, usando `expo-camera`, com feedback imediato (nome, preço, **desfazer**) e háptico a cada bipagem.
 - Cada bipagem soma automaticamente ao carrinho (produto repetido = quantidade +1).
-- Tela **Carrinho** com lista dos itens, ajuste manual de quantidade, remoção de item e total.
-- Motor de promoções: `% OFF`, `leve X pague Y` e `preço fixo promocional` (valem pra qualquer cliente, aplicadas automaticamente ao bipar).
-- **Login do cliente** (CPF + senha) — aba Perfil, com pontos de fidelidade exibidos após logar.
-- **Ofertas exclusivas de cliente logado** (aba Promoções) — o cliente ativa um desconto extra antes de bipar, igual ao padrão do "Meu BH" (Supermercados BH) e "Cliente Mais" (Pão de Açúcar): o desconto entra empilhado em cima da promoção normal do produto.
-- Carrinho e ofertas ativadas persistidos localmente (`AsyncStorage`) — se o app fechar, o cliente não perde nada.
-- Aviso de "prévia de pagamento" deixando claro que o valor é estimado.
+- Câmera pausa automaticamente quando a aba não está em foco (bateria/privacidade).
+- Tela **Carrinho** com lista dos itens, favoritar, ajuste manual de quantidade, remoção e total com hierarquia visual forte.
+- Motor de promoções: `% OFF`, `leve X pague Y` e `preço fixo promocional` (gerais da loja), mais **ofertas exclusivas de cliente logado** que se ativam na aba Promoções e empilham sobre a promoção geral.
+- **Finalizar compra** de verdade: arquiva a compra no histórico e limpa o carrinho (não é só um alerta).
+
+**Em torno do Scan & Go:**
+- **Home**: saudação, CTA "Começar/Continuar comprando", resumo do carrinho atual, ofertas, listas e compras recentes.
+- **Login do cliente** (CPF + senha) — aba Perfil, com pontos de fidelidade.
+- **Listas de compras**: criar, adicionar/remover itens, marcar como comprado; ao bipar na aba Comprar, item que bate com a lista ativa é marcado automaticamente ("✓ Item da sua lista").
+- **Histórico de compras**: data, itens, total, economia e **"Comprar novamente"** (adiciona os mesmos itens ao carrinho atual, com preço de hoje).
+- **Favoritos** (coração no item do carrinho).
+- **Orçamento**: definir um limite na aba Perfil; durante o Scan&Go mostra quanto resta, sem ser alarmista.
+- Tudo persistido localmente (`AsyncStorage`) — fechar o app não perde nada.
+- Design system centralizado em `src/theme/tokens.ts` + componentes base em `src/components/ui/`.
 
 ## O que é mock (pilot) e precisa de integração real
 
@@ -41,20 +50,33 @@ Tabelas principais:
 
 **Importante sobre segurança:** o app mobile não deve falar direto com o banco. O fluxo real é `app → API HTTP do supermercado → banco`. A API é quem valida login (hash de senha, nunca texto puro como no mock), calcula promoções válidas no momento, etc. O schema é o contrato de dados; a API é quem expõe isso com segurança.
 
+## Navegação
+
+5 abas: **Home** · **Comprar** (scanner) · **Listas** · **Histórico** · **Perfil**.
+Carrinho e Promoções continuam existindo como telas de verdade, só não ficam na barra de abas (acessadas a partir da Home/Comprar/Promoções) — ver `href: null` em `src/app/_layout.tsx`.
+
 ## Estrutura do projeto
 
 ```
 src/
-  app/            # telas/rotas (Expo Router)
-    index.tsx       # Scanner (câmera)
-    promotions.tsx  # Promoções (loja + exclusivas de cliente)
-    cart.tsx        # Carrinho
-    profile.tsx     # Login / perfil do cliente
-  components/     # componentes de UI (linha do carrinho)
-  context/        # estado global (carrinho, autenticação, promoções ativadas)
-  data/           # catálogo, usuários e ofertas mock
-  types.ts        # tipos compartilhados
-  utils/pricing.ts# cálculo de totais e promoções
+  app/              # telas/rotas (Expo Router)
+    index.tsx         # Home
+    comprar.tsx        # Scanner (câmera) — núcleo do Scan & Go
+    listas.tsx         # Listas de compras
+    historico.tsx       # Histórico + comprar novamente
+    cart.tsx            # Carrinho (fora da tab bar)
+    promotions.tsx      # Promoções (fora da tab bar)
+    profile.tsx          # Login / perfil / orçamento
+  components/
+    ui/                # Design system: Button, Card, Badge, EmptyState, Section
+    ProductRow.tsx      # linha do carrinho (favoritar, quantidade, total)
+  context/            # estado global: carrinho, auth, promoções ativadas,
+                       # listas, histórico, orçamento, favoritos (cada um
+                       # persistido em AsyncStorage)
+  data/               # catálogo, usuários e ofertas mock
+  theme/tokens.ts      # cores, espaçamento, radius, tipografia, sombras
+  types.ts             # tipos compartilhados
+  utils/pricing.ts     # cálculo de totais e promoções
 ```
 
 ## Como testar agora, sem gerar APK
@@ -101,5 +123,7 @@ Ambos passam limpos nesta versão. Também validei que o bundle JS compila corre
 
 - Trocar catálogo, promoções e login mock por chamadas à API real do supermercado (ver `SCHEMA.sql`).
 - Hash de senha de verdade (bcrypt/argon2) e token de sessão (JWT) em vez do mock atual.
-- Sincronizar `cart_sessions`/`cart_items` com o backend (histórico de compras, cruzar com o caixa).
+- Sincronizar `cart_sessions`/`cart_items` com o backend (histórico de compras, cruzar com o caixa). Hoje **listas, histórico, favoritos e orçamento vivem só no `AsyncStorage` do aparelho** — não sincronizam entre dispositivos nem sobrevivem a reinstalar o app. Se precisar disso, essas 4 entidades também viram tabelas (`shopping_lists`, `shopping_list_items`, `favorites`, `user_budget`) ligadas a `users.id`.
+- Imagens de produto: o catálogo mock não tem URLs de imagem, então o carrinho hoje não mostra foto do produto (a UI já está pronta para receber `product.imageUrl` quando o catálogo real tiver isso).
+- Adicionar suite de testes automatizados (Jest + React Native Testing Library) — hoje a validação é manual (typecheck, lint, `expo export` e teste do fluxo no dispositivo).
 - Ícone e splash screen com a marca do supermercado (hoje usa o placeholder padrão do Expo).

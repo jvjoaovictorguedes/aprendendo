@@ -1,11 +1,14 @@
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { colors, radius, spacing, typography } from '../theme/tokens';
 import { CartItem } from '../types';
 import { computeLineTotal, formatBRL } from '../utils/pricing';
 
 type Props = {
   item: CartItem;
   extraPercentOff?: number;
+  isFavorite?: boolean;
+  onToggleFavorite?: () => void;
   onIncrement: () => void;
   onDecrement: () => void;
   onRemove: () => void;
@@ -14,6 +17,8 @@ type Props = {
 export function ProductRow({
   item,
   extraPercentOff = 0,
+  isFavorite,
+  onToggleFavorite,
   onIncrement,
   onDecrement,
   onRemove,
@@ -24,7 +29,16 @@ export function ProductRow({
   return (
     <View style={styles.row}>
       <View style={styles.info}>
-        <Text style={styles.name}>{item.product.name}</Text>
+        <View style={styles.nameRow}>
+          <Text style={styles.name} numberOfLines={2}>
+            {item.product.name}
+          </Text>
+          {onToggleFavorite ? (
+            <TouchableOpacity onPress={onToggleFavorite} hitSlop={8} accessibilityLabel="Favoritar produto">
+              <Text style={styles.favoriteIcon}>{isFavorite ? '♥' : '♡'}</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
         <Text style={styles.unitPrice}>
           {formatBRL(item.product.price)} / {item.product.unit}
         </Text>
@@ -51,7 +65,7 @@ export function ProductRow({
           <Text style={styles.originalTotal}>{formatBRL(originalTotal)}</Text>
         ) : null}
         <Text style={styles.finalTotal}>{formatBRL(finalTotal)}</Text>
-        <TouchableOpacity onPress={onRemove} accessibilityLabel="Remover item">
+        <TouchableOpacity onPress={onRemove} accessibilityLabel="Remover item" hitSlop={8}>
           <Text style={styles.removeText}>remover</Text>
         </TouchableOpacity>
       </View>
@@ -62,31 +76,33 @@ export function ProductRow({
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: '#EEE',
+    borderBottomColor: colors.border,
     alignItems: 'center',
-    gap: 8,
+    gap: spacing.sm,
   },
   info: { flex: 1.4 },
-  name: { fontSize: 15, fontWeight: '600', color: '#1A1A1A' },
-  unitPrice: { fontSize: 12, color: '#777', marginTop: 2 },
-  promoLabel: { fontSize: 12, color: '#C0392B', marginTop: 4, fontWeight: '600' },
-  memberLabel: { fontSize: 12, color: '#1DB954', marginTop: 2, fontWeight: '600' },
-  quantityControl: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  name: { ...typography.bodyStrong, color: colors.text, flexShrink: 1 },
+  favoriteIcon: { fontSize: 16, color: colors.danger },
+  unitPrice: { ...typography.small, color: colors.textMuted, marginTop: 2 },
+  promoLabel: { ...typography.small, color: colors.danger, marginTop: 4, fontWeight: '600' },
+  memberLabel: { ...typography.small, color: colors.brand, marginTop: 2, fontWeight: '600' },
+  quantityControl: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   stepButton: {
     width: 28,
     height: 28,
-    borderRadius: 14,
-    backgroundColor: '#1DB954',
+    borderRadius: radius.pill,
+    backgroundColor: colors.brand,
     alignItems: 'center',
     justifyContent: 'center',
   },
   stepButtonText: { color: '#fff', fontSize: 18, fontWeight: '700', lineHeight: 20 },
-  quantity: { minWidth: 20, textAlign: 'center', fontSize: 15, fontWeight: '600' },
+  quantity: { minWidth: 20, textAlign: 'center', ...typography.bodyStrong, color: colors.text },
   totals: { alignItems: 'flex-end', minWidth: 90 },
-  originalTotal: { fontSize: 12, color: '#999', textDecorationLine: 'line-through' },
-  finalTotal: { fontSize: 15, fontWeight: '700', color: '#1A1A1A' },
-  removeText: { fontSize: 11, color: '#C0392B', marginTop: 4 },
+  originalTotal: { ...typography.small, color: colors.textFaint, textDecorationLine: 'line-through' },
+  finalTotal: { ...typography.bodyStrong, color: colors.text },
+  removeText: { ...typography.small, color: colors.danger, marginTop: 4 },
 });
