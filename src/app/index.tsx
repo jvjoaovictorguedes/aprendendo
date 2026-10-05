@@ -4,6 +4,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 
 import { useCart } from '../context/CartContext';
+import { usePromotions } from '../context/PromotionsContext';
 import { computeCartTotals, formatBRL } from '../utils/pricing';
 
 const SCAN_COOLDOWN_MS = 1500;
@@ -14,10 +15,11 @@ export default function ScannerScreen() {
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
   const { items, addByBarcode } = useCart();
+  const { extraPercentOffFor } = usePromotions();
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const lockRef = useRef(false);
 
-  const totals = computeCartTotals(items);
+  const totals = computeCartTotals(items, extraPercentOffFor);
 
   const handleScanned = useCallback(
     (result: BarcodeScanningResult) => {

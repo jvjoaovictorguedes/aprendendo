@@ -6,31 +6,35 @@ export type LineTotal = {
   savings: number;
 };
 
-export function computeLineTotal(item: CartItem): LineTotal {
+export function computeLineTotal(item: CartItem, extraPercentOff = 0): LineTotal {
   const { product, quantity } = item;
   const originalTotal = product.price * quantity;
   const promotion = product.promotion;
 
-  if (!promotion) {
-    return { originalTotal, finalTotal: originalTotal, savings: 0 };
-  }
-
   let finalTotal = originalTotal;
 
-  switch (promotion.kind) {
-    case 'percentOff':
-      finalTotal = originalTotal * (1 - promotion.percent / 100);
-      break;
-    case 'fixedPrice':
-      finalTotal = promotion.price * quantity;
-      break;
-    case 'buyXPayY': {
-      const fullGroups = Math.floor(quantity / promotion.buy);
-      const remainder = quantity % promotion.buy;
-      const payableUnits = fullGroups * promotion.pay + remainder;
-      finalTotal = product.price * payableUnits;
-      break;
+  if (promotion) {
+    switch (promotion.kind) {
+      case 'percentOff':
+        finalTotal = originalTotal * (1 - promotion.percent / 100);
+        break;
+      case 'fixedPrice':
+        finalTotal = promotion.price * quantity;
+        break;
+      case 'buyXPayY': {
+        const fullGroups = Math.floor(quantity / promotion.buy);
+        const remainder = quantity % promotion.buy;
+        const payableUnits = fullGroups * promotion.pay + remainder;
+        finalTotal = product.price * payableUnits;
+        break;
+      }
     }
+  }
+
+  // Desconto exclusivo de cliente logado, ativado na aba Promoções,
+  // aplicado por cima do preço já promocional (se houver).
+  if (extraPercentOff > 0) {
+    finalTotal = finalTotal * (1 - extraPercentOff / 100);
   }
 
   return {
@@ -47,10 +51,14 @@ export type CartTotals = {
   savings: number;
 };
 
-export function computeCartTotals(items: CartItem[]): CartTotals {
+export function computeCartTotals(
+  items: CartItem[],
+  getExtraPercentOff?: (barcode: string) => number,
+): CartTotals {
   return items.reduce<CartTotals>(
     (acc, item) => {
-      const line = computeLineTotal(item);
+      const extraPercentOff = getExtraPercentOff?.(item.product.barcode) ?? 0;
+      const line = computeLineTotal(item, extraPercentOff);
       return {
         itemCount: acc.itemCount + item.quantity,
         originalTotal: acc.originalTotal + line.originalTotal,

@@ -5,13 +5,20 @@ import { computeLineTotal, formatBRL } from '../utils/pricing';
 
 type Props = {
   item: CartItem;
+  extraPercentOff?: number;
   onIncrement: () => void;
   onDecrement: () => void;
   onRemove: () => void;
 };
 
-export function ProductRow({ item, onIncrement, onDecrement, onRemove }: Props) {
-  const { originalTotal, finalTotal, savings } = computeLineTotal(item);
+export function ProductRow({
+  item,
+  extraPercentOff = 0,
+  onIncrement,
+  onDecrement,
+  onRemove,
+}: Props) {
+  const { originalTotal, finalTotal, savings } = computeLineTotal(item, extraPercentOff);
   const hasPromotion = savings > 0;
 
   return (
@@ -23,6 +30,9 @@ export function ProductRow({ item, onIncrement, onDecrement, onRemove }: Props) 
         </Text>
         {item.product.promotion ? (
           <Text style={styles.promoLabel}>🏷 {item.product.promotion.label}</Text>
+        ) : null}
+        {extraPercentOff > 0 ? (
+          <Text style={styles.memberLabel}>⭐ Desconto de cliente ativo (-{extraPercentOff}%)</Text>
         ) : null}
       </View>
 
@@ -63,6 +73,7 @@ const styles = StyleSheet.create({
   name: { fontSize: 15, fontWeight: '600', color: '#1A1A1A' },
   unitPrice: { fontSize: 12, color: '#777', marginTop: 2 },
   promoLabel: { fontSize: 12, color: '#C0392B', marginTop: 4, fontWeight: '600' },
+  memberLabel: { fontSize: 12, color: '#1DB954', marginTop: 2, fontWeight: '600' },
   quantityControl: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   stepButton: {
     width: 28,

@@ -3,12 +3,14 @@ import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react
 
 import { ProductRow } from '../components/ProductRow';
 import { useCart } from '../context/CartContext';
+import { usePromotions } from '../context/PromotionsContext';
 import { computeCartTotals, formatBRL } from '../utils/pricing';
 
 export default function CartScreen() {
   const router = useRouter();
   const { items, incrementItem, decrementItem, removeItem, clearCart } = useCart();
-  const totals = computeCartTotals(items);
+  const { extraPercentOffFor } = usePromotions();
+  const totals = computeCartTotals(items, extraPercentOffFor);
 
   const confirmClear = () => {
     Alert.alert('Limpar carrinho', 'Remover todos os itens escaneados?', [
@@ -46,6 +48,7 @@ export default function CartScreen() {
         renderItem={({ item }) => (
           <ProductRow
             item={item}
+            extraPercentOff={extraPercentOffFor(item.product.barcode)}
             onIncrement={() => incrementItem(item.product.barcode)}
             onDecrement={() => decrementItem(item.product.barcode)}
             onRemove={() => removeItem(item.product.barcode)}
