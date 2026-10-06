@@ -136,17 +136,20 @@ export default function ComprarScreen() {
 
   return (
     <View style={styles.container}>
-      <CameraView
-        style={styles.camera}
-        facing="back"
-        active={isFocused}
-        onBarcodeScanned={isFocused ? handleScanned : undefined}
-        barcodeScannerSettings={{
-          barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128'],
-        }}
-      >
-        <View style={styles.scanFrame} />
-      </CameraView>
+      <View style={styles.cameraArea}>
+        <CameraView
+          style={StyleSheet.absoluteFill}
+          facing="back"
+          active={isFocused}
+          onBarcodeScanned={isFocused ? handleScanned : undefined}
+          barcodeScannerSettings={{
+            barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128'],
+          }}
+        />
+        <View style={[StyleSheet.absoluteFill, styles.scanFrameWrapper]} pointerEvents="none">
+          <View style={styles.scanFrame} />
+        </View>
+      </View>
 
       {activeList ? (
         <View style={styles.listBanner}>
@@ -214,7 +217,11 @@ export default function ComprarScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
-  camera: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  cameraArea: { flex: 1 },
+  scanFrameWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   scanFrame: {
     width: 260,
     height: 160,
