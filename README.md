@@ -27,75 +27,85 @@ App mobile (Expo / React Native) para clientes de supermercado. O cliente **bipa
 
 ## Conectando ao Supabase (catálogo real pro scanner)
 
-O catálogo de produtos **já busca no Supabase de verdade** quando configurado — não precisa mudar código, só configurar:
+O banco agora é **multi-tenant**: um projeto Supabase só, compartilhado por várias franquias (ver "Banco de dados" abaixo). Cada build do app representa UMA franquia, identificada por `EXPO_PUBLIC_TENANT_ID`.
 
 1. Crie um projeto grátis em [supabase.com](https://supabase.com).
-2. No **SQL Editor**, rode o arquivo [`SCHEMA.sql`](./SCHEMA.sql) inteiro (cria as tabelas, ativa RLS com leitura pública só em `products`/`promotions`/`member_promotions`/`stores`, e já popula com os mesmos produtos do mock).
+2. No **SQL Editor**, rode o arquivo [`SCHEMA.sql`](./SCHEMA.sql) inteiro (cria tenants, profiles, products, promotions etc., ativa RLS em tudo, e popula a franquia piloto com os mesmos produtos do mock). No fim do arquivo tem um passo manual (bootstrap do seu usuário platform_admin) — não pule.
 3. Em **Project Settings → API**, copie a `Project URL` e a chave `anon public`.
 4. Copie `.env.example` para `.env` na raiz do projeto e preencha:
    ```
    EXPO_PUBLIC_SUPABASE_URL=https://seu-projeto.supabase.co
    EXPO_PUBLIC_SUPABASE_ANON_KEY=sua-chave-anon
+   EXPO_PUBLIC_TENANT_ID=00000000-0000-0000-0000-000000000001
    ```
-5. Reinicie o `npx expo start` (ou gere um novo build) — o scanner (`src/services/catalog.ts`) passa a consultar `products`/`promotions` no Supabase a cada bipagem. Se a tabela não tiver aquele código de barras, aparece "Produto não cadastrado" (mesmo comportamento de antes).
+   O `TENANT_ID` acima já é o da franquia piloto que vem no seed do `SCHEMA.sql` — troque pelo `id` de outra linha em `tenants` pra rodar o app "como" outra franquia.
+5. Reinicie o `npx expo start` (ou gere um novo build) — o scanner (`src/services/catalog.ts`) passa a consultar `products`/`promotions` no Supabase a cada bipagem, sempre filtrado pela franquia do `.env` (via header `x-tenant-id`, reforçado por RLS no banco). Se a tabela não tiver aquele código de barras pra essa franquia, aparece "Produto não cadastrado" (mesmo comportamento de antes).
 
-Pra testar com dados seus: edite a tabela `products` direto no **Table Editor** do Supabase (adicionar/mudar preço/criar promoção) e gere uma imagem de código de barras com o mesmo número em qualquer gerador de EAN-13 online.
+Pra testar com dados seus: edite a tabela `products` direto no **Table Editor** do Supabase (adicionar/mudar preço/criar promoção), sempre preenchendo o `tenant_id` certo, e gere uma imagem de código de barras com o mesmo número em qualquer gerador de EAN-13 online.
 
-Sem o `.env` configurado, o app continua funcionando normalmente com o catálogo local mock — nada quebra.
+Sem o `.env` configurado (as três variáveis), o app continua funcionando normalmente com o catálogo local mock — nada quebra.
 
 **Importante pro build com EAS:** o `.env` local só vale pra rodar com `npx expo start`. Pra essas variáveis irem também no `.apk` gerado pelo `eas build`, configure-as como variáveis de ambiente do projeto na EAS (`eas env:create` ou pelo site expo.dev → seu projeto → Environment variables, marcando visibilidade "Plain text" para o perfil `preview`) — senão o app buildado cai no catálogo mock mesmo com o Supabase configurado localmente.
 
 ## O que é mock (pilot) e precisa de integração real
 
 - **Catálogo de produtos/promoções gerais**: já pode vir do Supabase (ver acima). Sem Supabase configurado, usa `src/data/products.ts`.
-- **Ofertas exclusivas de cliente**: `src/data/memberPromotions.ts` — ainda não migrado pro Supabase (próximo passo natural: mesma mecânica do catálogo).
-- **Login/usuários**: `src/data/users.ts` + `src/context/AuthContext.tsx` (senha em texto puro só porque é mock — isso NUNCA pode ir pra produção assim). Ponto de integração: a função `login()` dentro de `AuthContext.tsx`.
+- **Ofertas exclusivas de cliente**: `src/data/memberPromotions.ts` — ainda não migrado pro Supabase (próximo passo natural: mesma mecânica do catálogo, já tem tabela pronta no `SCHEMA.sql`).
+- **Login/usuários**: `src/data/users.ts` + `src/context/AuthContext.tsx` (senha em texto puro só porque é mock — isso NUNCA pode ir pra produção assim). O `SCHEMA.sql` já modela o jeito certo (Supabase Auth + `profiles`, sem senha própria) — falta só trocar a função `login()` em `AuthContext.tsx` para chamar `supabase.auth.signInWithPassword(...)` em vez do mock.
 
-## Banco de dados (schema esperado)
+## Banco de dados (multi-tenant, schema esperado)
 
-O arquivo **[`SCHEMA.sql`](./SCHEMA.sql)** na raiz do projeto tem o schema completo em PostgreSQL. As tabelas `products`, `promotions`, `member_promotions` e `stores` têm RLS com leitura pública (é o que o app consulta direto); as demais (`users`, `cart_sessions`, etc.) ficam com RLS ativo e sem política pública — só serão acessadas por uma API própria no futuro, nunca direto do app.
+O arquivo **[`SCHEMA.sql`](./SCHEMA.sql)** na raiz do projeto tem o schema completo em PostgreSQL, pensado pra vender a mesma base de código pra **várias franquias de supermercado com exclusividade territorial** (cada uma com sua própria marca, cores e catálogo, mas sem enxergar os dados umas das outras).
+
+Três papéis (`profiles.role`): **`platform_admin`** (você — vê e edita todas as franquias), **`tenant_admin`** (o dono da franquia — só vê e edita a própria, via o painel de Marca & Cores), **`customer`** (cliente final do app, escopado à franquia dele). Login é sempre via **Supabase Auth** — nada de senha em texto puro numa tabela própria — e cada franquia é isolada por **Row Level Security**, não só por filtro no app: até as leituras sem login (scanner anônimo) são restritas pelo header `x-tenant-id` que o app manda em toda consulta (ver `src/services/supabase.ts`).
 
 Tabelas principais:
 
 | Tabela | Pra quê serve | Mapeia pra qual tipo no app |
 |---|---|---|
-| `products` | Catálogo (nome, preço, categoria) | `Product` (`src/types.ts`) |
-| `promotions` | Promoções gerais da loja (% off, leve/pague, preço fixo) | `Product.promotion` |
-| `member_promotions` | Ofertas exclusivas de cliente logado | `MemberPromotion` (`src/data/memberPromotions.ts`) |
-| `users` | Clientes cadastrados (login) | `User` (`src/data/users.ts`) |
-| `user_activated_promotions` | Quais ofertas de cliente cada usuário ativou | estado do `PromotionsContext` |
-| `cart_sessions` / `cart_items` | Histórico de "passagens pelo mercado" — hoje o carrinho só vive no celular (`AsyncStorage`); essas tabelas são o destino quando o carrinho passar a sincronizar com o backend | `CartItem[]` do `CartContext` |
-| `stores` | Suporte a múltiplas lojas/filiais da rede | — |
+| `tenants` | Cada franquia: nome, cor, logo, plano, status, território de exclusividade | tela "Franquias" do admin |
+| `profiles` | Estende `auth.users` — role, franquia, pontos de fidelidade | `User` (`src/data/users.ts`) |
+| `products` | Catálogo por franquia (chave própria + `unique(tenant_id, barcode)`, não o barcode como PK — duas franquias podem ter o mesmo EAN com nome/preço diferentes) | `Product` (`src/types.ts`) |
+| `promotions` | Promoções gerais da loja (% off, leve/pague, preço fixo), por franquia | `Product.promotion` |
+| `member_promotions` / `member_promotion_activations` | Ofertas exclusivas de cliente logado e quem ativou o quê | `MemberPromotion` + estado do `PromotionsContext` |
+| `favorites` | Produtos favoritados, por cliente | `FavoritesContext` |
+| `cart_sessions` / `cart_items` | Histórico de "passagens pelo mercado" — hoje o carrinho só vive no celular (`AsyncStorage`); destino quando sincronizar com o backend | `CartItem[]` do `CartContext` |
+| `notifications` | Central de notificações por franquia (cupom expirando, aviso de orçamento, broadcast) | `NotificationsContext` |
+| `stores` | Lojas físicas de cada franquia | — |
+| `catalog_imports` | Auditoria de quando/quem importou o catálogo de uma franquia (CSV do cliente) | — |
 
-**Importante sobre segurança:** o app mobile não deve falar direto com o banco. O fluxo real é `app → API HTTP do supermercado → banco`. A API é quem valida login (hash de senha, nunca texto puro como no mock), calcula promoções válidas no momento, etc. O schema é o contrato de dados; a API é quem expõe isso com segurança.
+**Importante sobre segurança:** mesmo multi-tenant, o app mobile só fala direto com o banco pra leitura pública do catálogo (anon key + RLS). Login, carrinho sincronizado e qualquer escrita sensível devem passar por Supabase Auth + RLS de verdade (já no schema) — nunca confie só em filtro feito no app. O passo de "BOOTSTRAP" no fim do `SCHEMA.sql` promove sua primeira conta a `platform_admin`; sem isso ninguém gerencia franquia nenhuma.
 
 ## Navegação
 
-5 abas: **Home** · **Comprar** (scanner) · **Listas** · **Histórico** · **Perfil**.
-Carrinho e Promoções continuam existindo como telas de verdade, só não ficam na barra de abas (acessadas a partir da Home/Comprar/Promoções) — ver `href: null` em `src/app/_layout.tsx`.
+5 abas: **Início** · **Ofertas** · **Comprar** (scanner, botão elevado no centro) · **Listas** · **Conta** (perfil + cartão de fidelidade + favoritos + histórico + notificações, tudo unificado).
+Carrinho, Lojas e Notificações continuam existindo como telas de verdade, só não ficam na barra de abas — ver `href: null` em `src/app/_layout.tsx`.
 
 ## Estrutura do projeto
 
 ```
 src/
   app/              # telas/rotas (Expo Router)
-    index.tsx         # Home
+    index.tsx         # Início
     comprar.tsx        # Scanner (câmera) — núcleo do Scan & Go
+    promotions.tsx      # Ofertas (cupons + promoções da loja)
     listas.tsx         # Listas de compras
-    historico.tsx       # Histórico + comprar novamente
+    profile.tsx          # Conta: login, cartão de fidelidade, favoritos, histórico, orçamento
     cart.tsx            # Carrinho (fora da tab bar)
-    promotions.tsx      # Promoções (fora da tab bar)
-    profile.tsx          # Login / perfil / orçamento
+    historico.tsx       # Histórico completo + comprar novamente (fora da tab bar)
+    lojas.tsx           # Lojas físicas da franquia (fora da tab bar)
+    notifications.tsx   # Central de notificações (fora da tab bar)
   components/
-    ui/                # Design system: Button, Card, Badge, EmptyState, Section
+    ui/                # Design system: Button, Card, Badge, EmptyState, Icon, Section
     ProductRow.tsx      # linha do carrinho (favoritar, quantidade, total)
   context/            # estado global: carrinho, auth, promoções ativadas,
-                       # listas, histórico, orçamento, favoritos (cada um
-                       # persistido em AsyncStorage)
-  data/               # catálogo, usuários e ofertas mock
+                       # listas, histórico, orçamento, favoritos, notificações
+                       # (cada um persistido em AsyncStorage)
+  data/               # catálogo, usuários, ofertas, notificações e lojas mock
   theme/tokens.ts      # cores, espaçamento, radius, tipografia, sombras
   types.ts             # tipos compartilhados
   utils/pricing.ts     # cálculo de totais e promoções
+  utils/loyalty.ts     # nível de fidelidade (Bronze/Prata/Ouro) a partir dos pontos
 ```
 
 ## Como testar agora, sem gerar APK
