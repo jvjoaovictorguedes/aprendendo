@@ -148,6 +148,20 @@ npm run lint        # ESLint
 
 Ambos passam limpos nesta versão. Também validei que o bundle JS compila corretamente para Android via `npx expo export -p android`.
 
+## Fluxo de branches
+
+- **`main`** = produção. Só recebe código já testado, via Pull Request vindo da `dev`. Nunca commitar direto.
+- **`dev`** = desenvolvimento. Todo trabalho do dia a dia vai aqui (ou em branches `feature/...` criadas a partir dela).
+
+```bash
+git switch dev
+git pull
+# ... alterações, commits ...
+git push
+```
+
+Quando a `dev` estiver estável (typecheck e lint passando, fluxo testado no celular), abra um Pull Request `dev → main` no GitHub e faça o merge. Builds de produção (`eas build`) saem sempre da `main`.
+
 ## Próximos passos sugeridos
 
 - Migrar ofertas de cliente (`memberPromotions.ts`) e login (`users.ts`) pro Supabase igual ao catálogo — login precisa passar por uma função/API própria (nunca comparar senha direto do app), não só uma query de leitura.
