@@ -11,8 +11,22 @@
 --      admin-users) consegue gravar. Cadastro público sempre nasce customer.
 --   2. profiles ganha email (para listar no painel) e disabled_at (bloqueio).
 --   3. O guard de privilégios passa a proteger também email e disabled_at.
+--   4. CORREÇÃO: duas políticas consultavam "profiles" dentro de uma política
+--      de "profiles" → "infinite recursion detected in policy" em qualquer
+--      leitura da tabela (o painel nunca conseguia ler o perfil de quem entra).
+--      Agora usam is_tenant_admin() (security definer, não passa pelo RLS).
 
 begin;
+
+drop policy if exists "tenant admin reads profiles of own tenant" on public.profiles;
+create policy "tenant admin reads profiles of own tenant"
+  on public.profiles for select
+  using (public.is_tenant_admin() and tenant_id = public.current_tenant_id());
+
+drop policy if exists "tenant admin reads cart_sessions of own tenant" on public.cart_sessions;
+create policy "tenant admin reads cart_sessions of own tenant"
+  on public.cart_sessions for select
+  using (public.is_tenant_admin() and tenant_id = public.current_tenant_id());
 
 -- ============================================================
 -- 1. PROFILES: email e bloqueio

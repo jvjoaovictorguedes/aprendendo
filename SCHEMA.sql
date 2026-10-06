@@ -299,12 +299,9 @@ create policy "user updates own profile"
   using (id = auth.uid())
   with check (id = auth.uid() and tenant_id = public.current_tenant_id());
 
-create policy "tenant admin reads profiles of own tenant"
-  on public.profiles for select
-  using (
-    tenant_id = public.current_tenant_id()
-    and exists (select 1 from public.profiles me where me.id = auth.uid() and me.role = 'tenant_admin')
-  );
+-- "tenant admin reads profiles of own tenant" é criada na migração 002 com
+-- is_tenant_admin(). A versão antiga consultava "profiles" dentro da própria
+-- política e causava "infinite recursion detected in policy".
 
 -- STORES (lista de lojas é pública pro app do cliente final consultar)
 create policy "platform admin full access to stores"
@@ -413,12 +410,8 @@ create policy "customer manages own cart_sessions"
   using (profile_id = auth.uid())
   with check (profile_id = auth.uid() and tenant_id = public.current_tenant_id());
 
-create policy "tenant admin reads cart_sessions of own tenant"
-  on public.cart_sessions for select
-  using (
-    tenant_id = public.current_tenant_id()
-    and exists (select 1 from public.profiles me where me.id = auth.uid() and me.role = 'tenant_admin')
-  );
+-- "tenant admin reads cart_sessions of own tenant" é criada na migração 002
+-- (mesmo motivo da política de profiles acima).
 
 create policy "platform admin full access to cart_items"
   on public.cart_items for all
