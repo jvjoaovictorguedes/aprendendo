@@ -110,8 +110,8 @@ export default function ProfileScreen() {
       const granted = await setPushEnabled(value);
       if (value && !granted) {
         Alert.alert(
-          'Permissão necessária',
-          'Para receber notificações, permita o acesso nas configurações do celular.',
+          'Push indisponível',
+          'Não foi possível ativar notificações push agora — pode ser permissão negada no celular, ou o app rodando no Expo Go (push exige um development build). O centro de notificações continua funcionando normalmente.',
         );
       }
     };

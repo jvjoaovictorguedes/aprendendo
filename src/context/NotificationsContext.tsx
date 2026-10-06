@@ -1,5 +1,4 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Notifications from 'expo-notifications';
 import {
   createContext,
   PropsWithChildren,
@@ -15,16 +14,38 @@ import { INITIAL_NOTIFICATIONS, NotificationItem, NotificationKind } from '../da
 const STORAGE_KEY = 'scanmercado:notifications:v1';
 const PUSH_ENABLED_KEY = 'scanmercado:push-enabled:v1';
 
-// Precisa rodar antes da primeira renderização: controla se uma notificação
-// chegando com o app aberto aparece como banner/lista (SDK 57+).
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-});
+// expo-notifications derruba o app no Expo Go (Android, a partir da SDK 53,
+// e também no iOS para push remoto) com um throw síncrono ao ser carregado.
+// Por isso nunca importamos o pacote no topo do arquivo: carregamos sob
+// demanda (só quando o cliente liga o push) e qualquer falha — Expo Go,
+// permissão negada, o que for — cai graciosamente para "push indisponível",
+// sem derrubar o app. O centro de notificações in-app funciona sempre,
+// independente disso.
+type NotificationsModule = typeof import('expo-notifications');
+
+let notificationsModulePromise: Promise<NotificationsModule | null> | null = null;
+
+function loadNotificationsModule(): Promise<NotificationsModule | null> {
+  if (!notificationsModulePromise) {
+    notificationsModulePromise = (async () => {
+      try {
+        const mod: NotificationsModule = await import('expo-notifications');
+        mod.setNotificationHandler({
+          handleNotification: async () => ({
+            shouldShowBanner: true,
+            shouldShowList: true,
+            shouldPlaySound: false,
+            shouldSetBadge: false,
+          }),
+        });
+        return mod;
+      } catch {
+        return null;
+      }
+    })();
+  }
+  return notificationsModulePromise;
+}
 
 type NotificationsContextValue = {
   notifications: NotificationItem[];
@@ -83,12 +104,12 @@ export function NotificationsProvider({ children }: PropsWithChildren) {
       setNotifications((current) => [item, ...current]);
 
       if (pushEnabled) {
-        Notifications.getPermissionsAsync()
-          .then((permission) => {
-            if (!permission.granted) return;
-            return Notifications.scheduleNotificationAsync({
-              content: { title, body },
-              trigger: null,
+        loadNotificationsModule()
+          .then((mod) => {
+            if (!mod) return;
+            return mod.getPermissionsAsync().then((permission) => {
+              if (!permission.granted) return;
+              return mod.scheduleNotificationAsync({ content: { title, body }, trigger: null });
             });
           })
           .catch(() => {});
@@ -104,10 +125,22 @@ export function NotificationsProvider({ children }: PropsWithChildren) {
       return true;
     }
 
-    const { granted } = await Notifications.requestPermissionsAsync();
-    setPushEnabledState(granted);
-    AsyncStorage.setItem(PUSH_ENABLED_KEY, JSON.stringify(granted)).catch(() => {});
-    return granted;
+    const mod = await loadNotificationsModule();
+    if (!mod) {
+      setPushEnabledState(false);
+      AsyncStorage.setItem(PUSH_ENABLED_KEY, JSON.stringify(false)).catch(() => {});
+      return false;
+    }
+
+    try {
+      const { granted } = await mod.requestPermissionsAsync();
+      setPushEnabledState(granted);
+      AsyncStorage.setItem(PUSH_ENABLED_KEY, JSON.stringify(granted)).catch(() => {});
+      return granted;
+    } catch {
+      setPushEnabledState(false);
+      return false;
+    }
   }, []);
 
   const unreadCount = notifications.filter((item) => !item.read).length;
