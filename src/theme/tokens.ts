@@ -1,5 +1,9 @@
 // Design tokens do ScanMercado. Toda tela/componente deve consumir
 // daqui em vez de usar valores soltos (cor, espaçamento, radius...).
+//
+// As cores da marca (brand*) são da franquia: applyBrand() troca antes de
+// qualquer tela carregar (ver src/brand/BrandedApp.tsx), então os
+// StyleSheet.create das telas já nascem com a cor certa.
 
 export const colors = {
   brand: '#1DB954',
@@ -26,7 +30,38 @@ export const colors = {
   starGold: '#FFD166',
 
   overlay: 'rgba(10, 12, 14, 0.55)',
-} as const;
+};
+
+/** Nome e logo da franquia deste app (padrão: ScanMercado). */
+export const brand: { name: string; logoUrl: string | null } = {
+  name: 'ScanMercado',
+  logoUrl: null,
+};
+
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+
+function mixHex(hex: string, target: number, amount: number): string {
+  const channels = [1, 3, 5].map((start) => parseInt(hex.slice(start, start + 2), 16));
+  return (
+    '#' +
+    channels
+      .map((value) => Math.round(value + (target - value) * amount))
+      .map((value) => value.toString(16).padStart(2, '0'))
+      .join('')
+      .toUpperCase()
+  );
+}
+
+/** Aplica a marca da franquia. Tem que rodar antes das telas carregarem. */
+export function applyBrand(next: { name?: string | null; accentColor?: string | null; logoUrl?: string | null }) {
+  if (next.name) brand.name = next.name;
+  brand.logoUrl = next.logoUrl ?? null;
+  if (next.accentColor && HEX_COLOR.test(next.accentColor)) {
+    colors.brand = next.accentColor.toUpperCase();
+    colors.brandDark = mixHex(next.accentColor, 0, 0.18);
+    colors.brandSoft = mixHex(next.accentColor, 255, 0.9);
+  }
+}
 
 export const spacing = {
   xs: 4,

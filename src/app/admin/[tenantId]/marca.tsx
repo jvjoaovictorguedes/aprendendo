@@ -81,7 +81,10 @@ export default function BrandScreen() {
         error ? <StatusMessage status={{ kind: 'error', message: error }} /> : <Loading />
       ) : (
         <>
-          <AdminSection title="Marca" description="Como a franquia aparece para os clientes.">
+          <AdminSection
+            title="Marca"
+            description="Como a franquia aparece para os clientes. O app aplica a nova marca na próxima vez que for aberto."
+          >
             <Field label="Nome" value={form.name} onChangeText={(name) => update({ name })} error={nameError} />
             <View style={styles.colorRow}>
               <View style={{ flex: 1 }}>

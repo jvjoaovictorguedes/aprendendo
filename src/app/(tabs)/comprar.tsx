@@ -11,7 +11,7 @@ import { useLists } from '../../context/ListsContext';
 import { useNotifications } from '../../context/NotificationsContext';
 import { usePromotions } from '../../context/PromotionsContext';
 import { useTenantSettings } from '../../context/TenantSettingsContext';
-import { colors, radius, spacing, typography } from '../../theme/tokens';
+import { brand, colors, radius, spacing, typography } from '../../theme/tokens';
 import { computeCartTotals, formatBRL, formatKg } from '../../utils/pricing';
 
 type Feedback =
@@ -138,7 +138,7 @@ export default function ComprarScreen() {
         <Icon name="camera" size={40} color={colors.brand} />
         <Text style={styles.permissionTitle}>Câmera necessária</Text>
         <Text style={styles.permissionText}>
-          Para bipar os produtos, o ScanMercado precisa acessar a câmera do seu celular.
+          Para bipar os produtos, o {brand.name} precisa acessar a câmera do seu celular.
         </Text>
         <Button label="Permitir acesso à câmera" onPress={requestPermission} />
       </View>

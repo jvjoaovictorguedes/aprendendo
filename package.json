@@ -1,7 +1,7 @@
 {
   "name": "aprendendo",
   "version": "1.0.0",
-  "main": "expo-router/entry",
+  "main": "index.ts",
   "dependencies": {
     "@expo/metro-runtime": "^57.0.16",
     "@expo/vector-icons": "^15.1.1",

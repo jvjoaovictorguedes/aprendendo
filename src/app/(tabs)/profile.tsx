@@ -20,7 +20,7 @@ import { useFavorites } from '../../context/FavoritesContext';
 import { useHistory } from '../../context/HistoryContext';
 import { useNotifications } from '../../context/NotificationsContext';
 import { findProductByBarcode } from '../../data/products';
-import { colors, radius, spacing, typography } from '../../theme/tokens';
+import { brand, colors, radius, spacing, typography } from '../../theme/tokens';
 import { getTierProgress } from '../../utils/loyalty';
 import { formatBRL } from '../../utils/pricing';
 
@@ -129,7 +129,7 @@ export default function ProfileScreen() {
         <View style={styles.loyaltyCard}>
           <View style={styles.loyaltyTop}>
             <View>
-              <Text style={styles.loyaltyCardLabel}>Cartão ScanMercado</Text>
+              <Text style={styles.loyaltyCardLabel}>Cartão {brand.name}</Text>
               <Text style={styles.loyaltyCardName}>{user.name}</Text>
             </View>
             <View style={styles.tierBadge}>

@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { Badge, Button, Card, Icon, Section } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
@@ -12,7 +12,7 @@ import { useNotifications } from '../../context/NotificationsContext';
 import { usePromotions } from '../../context/PromotionsContext';
 import { MEMBER_PROMOTIONS } from '../../data/memberPromotions';
 import { MOCK_PRODUCTS } from '../../data/products';
-import { colors, radius, spacing, typography } from '../../theme/tokens';
+import { brand, colors, radius, spacing, typography } from '../../theme/tokens';
 import { computeCartTotals, formatBRL } from '../../utils/pricing';
 
 const storeOffers = MOCK_PRODUCTS.filter((product) => product.promotion).slice(0, 3);
@@ -58,6 +58,9 @@ export default function HomeScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
       <View style={styles.header}>
+        {brand.logoUrl ? (
+          <Image source={{ uri: brand.logoUrl }} style={styles.logo} accessibilityLabel={brand.name} />
+        ) : null}
         <View style={{ flex: 1 }}>
           <Text style={styles.greeting}>
             {getGreeting()}
@@ -65,7 +68,7 @@ export default function HomeScreen() {
           </Text>
           <View style={styles.storeRow}>
             <Icon name="map-pin" size={13} color={colors.textMuted} />
-            <Text style={styles.store}>Loja Centro</Text>
+            <Text style={styles.store}>{brand.name}</Text>
           </View>
         </View>
         <TouchableOpacity
@@ -279,6 +282,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     gap: spacing.sm,
   },
+  logo: { width: 44, height: 44, borderRadius: radius.md, marginRight: spacing.md },
   greeting: { ...typography.h1, color: colors.text },
   storeRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   store: { ...typography.caption, color: colors.textMuted },
