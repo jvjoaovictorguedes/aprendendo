@@ -24,6 +24,16 @@ type AdminAuthContextValue = {
 
 const AdminAuthContext = createContext<AdminAuthContextValue | undefined>(undefined);
 
+// Só em desenvolvimento (npx expo start). Nunca preencha isso no ambiente
+// de build (EAS) — variáveis EXPO_PUBLIC_ vão para dentro do app.
+const DEV_AUTO_LOGIN =
+  __DEV__ && process.env.EXPO_PUBLIC_ADMIN_DEV_EMAIL && process.env.EXPO_PUBLIC_ADMIN_DEV_PASSWORD
+    ? {
+        email: process.env.EXPO_PUBLIC_ADMIN_DEV_EMAIL,
+        password: process.env.EXPO_PUBLIC_ADMIN_DEV_PASSWORD,
+      }
+    : null;
+
 /** Login do painel admin — Supabase Auth de verdade (e-mail + senha). */
 export function AdminAuthProvider({ children }: PropsWithChildren) {
   const [sessionChecked, setSessionChecked] = useState(false);
@@ -36,8 +46,17 @@ export function AdminAuthProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     if (!supabase) return;
 
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
+    const client = supabase;
+    client.auth.getSession().then(async ({ data }) => {
+      let current = data.session;
+      // Modo de teste: em desenvolvimento, entra sozinho com a conta do .env
+      // e o painel abre sem tela de login. Build de produção nunca faz isso.
+      if (!current && DEV_AUTO_LOGIN) {
+        const { data: signed, error } = await client.auth.signInWithPassword(DEV_AUTO_LOGIN);
+        if (error) console.warn('Login automático de desenvolvimento falhou:', error.message);
+        current = signed.session;
+      }
+      setSession(current);
       setSessionChecked(true);
     });
 

@@ -1,6 +1,19 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { describeError, fetchTenant, Tenant, TenantPlan, TenantStatus } from '../../services/admin';
+import {
+  describeError,
+  fetchTenant,
+  ProfileRole,
+  Tenant,
+  TenantPlan,
+  TenantStatus,
+} from '../../services/admin';
+
+export const ROLE_OPTIONS: { value: ProfileRole; label: string }[] = [
+  { value: 'tenant_admin', label: 'Admin da franquia' },
+  { value: 'platform_admin', label: 'Equipe da plataforma' },
+  { value: 'customer', label: 'Cliente do app' },
+];
 
 export const STATUS_OPTIONS: { value: TenantStatus; label: string }[] = [
   { value: 'ativa', label: 'Ativa' },

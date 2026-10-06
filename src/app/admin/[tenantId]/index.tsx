@@ -29,7 +29,7 @@ export default function TenantHome() {
           ? `${optionLabel(PLAN_OPTIONS, tenant.plan)} · ${optionLabel(STATUS_OPTIONS, tenant.status)}`
           : undefined
       }
-      onBack={isPlatformAdmin ? () => router.push('/admin') : () => router.replace('/')}
+      onBack={isPlatformAdmin ? () => router.push('/admin/franquias') : () => router.replace('/')}
       backLabel={isPlatformAdmin ? 'Franquias' : 'Voltar ao app'}
       actions={isPlatformAdmin ? null : <Button label="Sair" variant="ghost" onPress={signOut} />}
     >
@@ -66,6 +66,14 @@ export default function TenantHome() {
             }
             onPress={() => go('/admin/[tenantId]/marca')}
           />
+          {isPlatformAdmin ? (
+            <NavCard
+              icon="users"
+              title="Usuários"
+              description="Quem administra esta franquia no painel."
+              onPress={() => router.push({ pathname: '/admin/usuarios', params: { franquia: tenantId } })}
+            />
+          ) : null}
         </View>
       ) : null}
     </AdminPage>
