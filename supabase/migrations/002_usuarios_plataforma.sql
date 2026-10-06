@@ -1,14 +1,14 @@
 -- ScanMercado — migração 002
 -- Gestão de usuários pela plataforma (painel admin → Usuários).
 --
--- Rode UMA vez no SQL Editor, depois da 001.
+-- Rode no SQL Editor depois da 001 (pode rodar de novo sem problema).
 --
 -- O que muda:
 --   1. CORREÇÃO CRÍTICA: handle_new_user lia o "role" de raw_user_meta_data,
 --      que é o próprio usuário quem preenche no signUp — qualquer pessoa podia
 --      se cadastrar já como platform_admin. Agora o papel vem só de
---      raw_app_meta_data, que só o servidor (service_role, Edge Function
---      admin-users) consegue gravar. Cadastro público sempre nasce customer.
+--      raw_app_meta_data, que só o servidor consegue gravar (funções
+--      admin_* da migração 005). Cadastro público sempre nasce customer.
 --   2. profiles ganha email (para listar no painel) e disabled_at (bloqueio).
 --   3. O guard de privilégios passa a proteger também email e disabled_at.
 --   4. CORREÇÃO: duas políticas consultavam "profiles" dentro de uma política
@@ -17,16 +17,6 @@
 --      Agora usam is_tenant_admin() (security definer, não passa pelo RLS).
 
 begin;
-
-drop policy if exists "tenant admin reads profiles of own tenant" on public.profiles;
-create policy "tenant admin reads profiles of own tenant"
-  on public.profiles for select
-  using (public.is_tenant_admin() and tenant_id = public.current_tenant_id());
-
-drop policy if exists "tenant admin reads cart_sessions of own tenant" on public.cart_sessions;
-create policy "tenant admin reads cart_sessions of own tenant"
-  on public.cart_sessions for select
-  using (public.is_tenant_admin() and tenant_id = public.current_tenant_id());
 
 -- ============================================================
 -- 1. PROFILES: email e bloqueio
@@ -112,5 +102,18 @@ as $$
     false
   )
 $$;
+
+-- ============================================================
+-- 4. Políticas sem recursão (depois de is_tenant_admin existir)
+-- ============================================================
+drop policy if exists "tenant admin reads profiles of own tenant" on public.profiles;
+create policy "tenant admin reads profiles of own tenant"
+  on public.profiles for select
+  using (public.is_tenant_admin() and tenant_id = public.current_tenant_id());
+
+drop policy if exists "tenant admin reads cart_sessions of own tenant" on public.cart_sessions;
+create policy "tenant admin reads cart_sessions of own tenant"
+  on public.cart_sessions for select
+  using (public.is_tenant_admin() and tenant_id = public.current_tenant_id());
 
 commit;

@@ -1,9 +1,7 @@
 // Usuários do painel (só platform_admin). Leitura e mudança de papel/franquia
 // vão direto na tabela profiles (RLS + guard_profile_privileges); criar
-// conta, redefinir senha e bloquear passam pela Edge Function admin-users,
-// que tem a chave service_role no servidor.
-
-import { FunctionsHttpError } from '@supabase/supabase-js';
+// conta, redefinir senha e bloquear são funções do banco (migração 005),
+// que recusam quem não é platform_admin.
 
 import { ProfileRole } from './admin';
 import { supabase } from './supabase';
@@ -89,37 +87,30 @@ export async function updateUser(
   if (error) throw error;
 }
 
-async function callAdminUsers<T>(body: Record<string, unknown>): Promise<T> {
-  const { data, error } = await client().functions.invoke<T>('admin-users', { body });
-  if (error) {
-    // A função devolve { error: "mensagem" } — mostra ela em vez do genérico.
-    if (error instanceof FunctionsHttpError) {
-      const payload = await error.context.json().catch(() => null);
-      if (payload?.error) throw new Error(payload.error);
-    }
-    if (error.message.includes('Failed to send') || error.message.includes('not found')) {
-      throw new Error(
-        'Edge Function admin-users não encontrada. Faça o deploy dela no Supabase (ver README).',
-      );
-    }
-    throw error;
-  }
-  return data as T;
-}
-
-export function createUser(input: {
+export async function createUser(input: {
   email: string;
   name: string;
   role: 'platform_admin' | 'tenant_admin';
   tenantId: string | null;
-}) {
-  return callAdminUsers<{ userId: string; temporaryPassword: string }>({ action: 'create', ...input });
+}): Promise<{ userId: string; temporaryPassword: string }> {
+  const { data, error } = await client().rpc('admin_create_user', {
+    p_email: input.email,
+    p_name: input.name,
+    p_role: input.role,
+    p_tenant_id: input.tenantId,
+  });
+  if (error) throw error;
+  const result = data as { user_id: string; temporary_password: string };
+  return { userId: result.user_id, temporaryPassword: result.temporary_password };
 }
 
-export function resetUserPassword(userId: string) {
-  return callAdminUsers<{ temporaryPassword: string }>({ action: 'reset_password', userId });
+export async function resetUserPassword(userId: string): Promise<{ temporaryPassword: string }> {
+  const { data, error } = await client().rpc('admin_reset_password', { p_user_id: userId });
+  if (error) throw error;
+  return { temporaryPassword: data as string };
 }
 
-export function setUserDisabled(userId: string, disabled: boolean) {
-  return callAdminUsers<{ ok: true }>({ action: 'set_disabled', userId, disabled });
+export async function setUserDisabled(userId: string, disabled: boolean): Promise<void> {
+  const { error } = await client().rpc('admin_set_user_disabled', { p_user_id: userId, p_disabled: disabled });
+  if (error) throw error;
 }

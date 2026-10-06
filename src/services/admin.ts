@@ -68,7 +68,9 @@ export function describeError(err: unknown): string {
   const e = err as { code?: string; message?: string } | null;
   switch (e?.code) {
     case '23505':
-      return 'Já existe um registro com esse código nesta franquia.';
+      return e?.message?.startsWith('Já existe')
+        ? e.message
+        : 'Já existe um registro com esse valor (e-mail, slug, código de barras ou PLU repetido).';
     case '23514':
       return 'Algum valor está fora do permitido. Confira os campos.';
     case '42501':

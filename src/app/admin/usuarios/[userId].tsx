@@ -55,7 +55,11 @@ function TemporaryPassword({ email, password }: { email: string; password: strin
 export default function UserEditScreen() {
   const router = useRouter();
   const { session, isPlatformAdmin } = useAdminAuth();
-  const { userId, franquia } = useLocalSearchParams<{ userId: string; franquia?: string }>();
+  const { userId: routeUserId, franquia } = useLocalSearchParams<{ userId: string; franquia?: string }>();
+  // Depois de criar, a tela continua montada com o id novo — trocar de rota
+  // remontaria a tela e perderia a senha temporária, que só aparece uma vez.
+  const [createdUserId, setCreatedUserId] = useState<string | null>(null);
+  const userId = createdUserId ?? routeUserId;
   const isNew = userId === NEW_USER_ID;
   const isSelf = userId === session?.user.id;
 
@@ -118,10 +122,7 @@ export default function UserEditScreen() {
           tenantId: form.role === 'platform_admin' ? null : form.tenantId,
         });
         setTemporary({ email: form.email.trim(), password: result.temporaryPassword });
-        router.replace({
-          pathname: '/admin/usuarios/[userId]',
-          params: franquia ? { userId: result.userId, franquia } : { userId: result.userId },
-        });
+        setCreatedUserId(result.userId);
         setStatus({ kind: 'success', message: 'Usuário criado. Ele já pode entrar no painel.' });
       } else {
         await updateUser(userId, { name: form.name.trim(), role: form.role, tenantId: form.tenantId });

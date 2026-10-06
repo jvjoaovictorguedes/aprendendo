@@ -31,9 +31,11 @@ App mobile (Expo / React Native) para clientes de supermercado. O cliente **bipa
 O banco agora é **multi-tenant**: um projeto Supabase só, compartilhado por várias franquias (ver "Banco de dados" abaixo). Cada build do app representa UMA franquia, identificada por `EXPO_PUBLIC_TENANT_ID`.
 
 1. Crie um projeto grátis em [supabase.com](https://supabase.com).
-2. No **SQL Editor**, rode o arquivo [`SCHEMA.sql`](./SCHEMA.sql) inteiro (cria tenants, profiles, products, promotions etc., ativa RLS em tudo, e popula a franquia piloto com os mesmos produtos do mock). Depois rode, em ordem, cada arquivo de [`supabase/migrations/`](./supabase/migrations) (uma vez só). No fim do `SCHEMA.sql` tem um passo manual (bootstrap do seu usuário platform_admin) — não pule.
+2. No **SQL Editor**, rode o arquivo [`SCHEMA.sql`](./SCHEMA.sql) inteiro (cria tenants, profiles, products, promotions etc., ativa RLS em tudo, e popula a franquia piloto com os mesmos produtos do mock).
+3. Em seguida rode [`supabase/aplicar_tudo.sql`](./supabase/aplicar_tudo.sql) inteiro — são todas as migrações de [`supabase/migrations/`](./supabase/migrations) juntas, na ordem. É idempotente: banco que **já existia** (com parte das migrações aplicada) também roda ele inteiro, quantas vezes precisar. Ele adiciona PLU, `tenant_settings`, marca pública do app, gestão de usuários no banco e corrige as falhas de RLS (cliente editando catálogo, cadastro escolhendo o próprio papel, recursão em `profiles`).
+4. Crie sua conta de admin principal com [`supabase/seed_usuarios_admin.sql`](./supabase/seed_usuarios_admin.sql) (troque e-mail/senha no próprio SQL Editor).
 
-   Banco que **já existia** antes do painel admin: rode só [`supabase/migrations/001_balanca_config_franquia_admin.sql`](./supabase/migrations/001_balanca_config_franquia_admin.sql). Ela adiciona o PLU, a tabela `tenant_settings` e corrige duas falhas de RLS (cliente logado conseguia editar catálogo da própria franquia e se promover a admin). Em seguida rode a `002_usuarios_plataforma.sql` — ela corrige o cadastro público, que aceitava a pessoa escolher o próprio papel (inclusive `platform_admin`).
+   Ao criar uma migração nova em `supabase/migrations/`, gere o `aplicar_tudo.sql` de novo (concatenação dos arquivos em ordem).
 3. Em **Project Settings → API**, copie a `Project URL` e a chave `anon public`.
 4. Copie `.env.example` para `.env` na raiz do projeto e preencha:
    ```
@@ -93,15 +95,7 @@ Fica no próprio app, em `/admin` — no celular pela aba **Conta → Área do l
 | Regras do app | % do orçamento para avisar o cliente e intervalo entre bipagens. |
 | Marca e dados | Nome, cor e logo (dono da franquia edita); plano, status, slug e território (só `platform_admin` — o banco recusa o resto). |
 
-**Edge Function `admin-users`** (obrigatória para a tela Usuários): criar conta, redefinir senha e bloquear exigem a chave `service_role`, que nunca pode ir dentro do app. Por isso essas ações rodam em [`supabase/functions/admin-users`](./supabase/functions/admin-users/index.ts), no servidor do Supabase, e só aceitam chamadas de um `platform_admin`. Deploy:
-
-```bash
-npx supabase login
-npx supabase link --project-ref SEU-PROJECT-REF
-npx supabase functions deploy admin-users
-```
-
-(ou no painel do Supabase: Edge Functions → Create function → nome `admin-users` → cole o conteúdo do `index.ts`.)
+**Criar usuário, redefinir senha e bloquear** são funções do próprio banco (`admin_create_user`, `admin_reset_password`, `admin_set_user_disabled`, migração 005) — nada para publicar à parte. Elas rodam com permissão para escrever em `auth.users`, mas a primeira coisa que fazem é recusar quem não é `platform_admin` ativo; anônimo nem consegue executar.
 
 **Teste sem tela de login:** em desenvolvimento, preencha `EXPO_PUBLIC_ADMIN_DEV_EMAIL` e `EXPO_PUBLIC_ADMIN_DEV_PASSWORD` no `.env` (ver `.env.example`) e o painel entra sozinho nessa conta. Build de produção ignora essas variáveis — nunca as coloque no EAS.
 

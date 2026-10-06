@@ -6,9 +6,9 @@
 -- reforçado por Row Level Security (RLS), não só por filtro no app.
 --
 -- Rode este arquivo inteiro num Postgres vazio (Supabase > SQL Editor).
--- Em seguida rode, em ordem, os arquivos de supabase/migrations/ (cada um
--- uma vez só). Depois veja o bloco "BOOTSTRAP" no final — é o único passo
--- manual (promover seu primeiro usuário a platform_admin).
+-- Em seguida rode supabase/aplicar_tudo.sql (todas as migrações juntas;
+-- pode rodar de novo sem problema) e crie o admin principal com
+-- supabase/seed_usuarios_admin.sql.
 
 -- ============================================================
 -- TENANTS — cada franquia/rede de supermercado cliente
