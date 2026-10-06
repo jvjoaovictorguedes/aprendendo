@@ -240,7 +240,7 @@ export default function ProfileScreen() {
     setIsSubmitting(false);
 
     if (result.status === 'invalid_credentials') {
-      Alert.alert('Não foi possível entrar', 'CPF ou senha incorretos.');
+      Alert.alert('Não foi possível entrar', result.message ?? 'CPF ou senha incorretos.');
     }
   };
 

@@ -9,7 +9,7 @@ import { spacing } from '../../theme/tokens';
 /** Início do painel da plataforma (equipe ScanMercado). */
 export default function PlatformHome() {
   const router = useRouter();
-  const { profile, session, isPlatformAdmin, signOut } = useAdminAuth();
+  const { profile, isPlatformAdmin, signOut } = useAdminAuth();
 
   // Admin de franquia vai direto para a própria franquia.
   if (!isPlatformAdmin && profile?.tenantId) {
@@ -19,7 +19,7 @@ export default function PlatformHome() {
   return (
     <AdminPage
       title="Plataforma"
-      subtitle={`Olá, ${profile?.name || session?.user.email || 'admin'}`}
+      subtitle={`Olá, ${profile?.name || profile?.email || 'admin'}`}
       onBack={() => router.replace('/')}
       backLabel="Voltar ao app"
       actions={<Button label="Sair" variant="ghost" onPress={signOut} />}

@@ -54,14 +54,14 @@ function TemporaryPassword({ email, password }: { email: string; password: strin
 
 export default function UserEditScreen() {
   const router = useRouter();
-  const { session, isPlatformAdmin } = useAdminAuth();
+  const { profile, isPlatformAdmin } = useAdminAuth();
   const { userId: routeUserId, franquia } = useLocalSearchParams<{ userId: string; franquia?: string }>();
   // Depois de criar, a tela continua montada com o id novo — trocar de rota
   // remontaria a tela e perderia a senha temporária, que só aparece uma vez.
   const [createdUserId, setCreatedUserId] = useState<string | null>(null);
   const userId = createdUserId ?? routeUserId;
   const isNew = userId === NEW_USER_ID;
-  const isSelf = userId === session?.user.id;
+  const isSelf = userId === profile?.id;
 
   const [user, setUser] = useState<ManagedUser | null>(null);
   const [form, setForm] = useState<Form | null>(

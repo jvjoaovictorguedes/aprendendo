@@ -1,6 +1,5 @@
 import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Text } from 'react-native';
 
 import {
   AdminPage,
@@ -12,8 +11,7 @@ import {
 } from '../../components/admin/AdminUI';
 import { Button } from '../../components/ui';
 import { AdminAuthProvider, useAdminAuth } from '../../context/AdminAuthContext';
-import { isSupabaseAvailable } from '../../services/supabase';
-import { colors, typography } from '../../theme/tokens';
+import { isApiAvailable } from '../../services/api';
 
 function AdminLogin() {
   const router = useRouter();
@@ -42,13 +40,9 @@ function AdminLogin() {
       backLabel="Voltar ao app"
     >
       <AdminSection title="Login">
-        {!isSupabaseAvailable ? (
+        {!isApiAvailable ? (
           <StatusMessage
-            status={{
-              kind: 'error',
-              message:
-                'Supabase não configurado: preencha EXPO_PUBLIC_SUPABASE_URL e EXPO_PUBLIC_SUPABASE_ANON_KEY no .env.',
-            }}
+            status={{ kind: 'error', message: 'API não configurada: preencha EXPO_PUBLIC_API_URL no .env.' }}
           />
         ) : null}
         <Field
@@ -75,27 +69,67 @@ function AdminLogin() {
   );
 }
 
-function NoAccess() {
-  const { signOut, session } = useAdminAuth();
+/** Primeiro acesso com senha temporária: troca obrigatória antes de usar o painel. */
+function ChangePassword() {
+  const { profile, changePassword, signOut } = useAdminAuth();
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [confirmation, setConfirmation] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [status, setStatus] = useState<Status>(null);
+
+  const handleSubmit = async () => {
+    if (next.length < 8) {
+      setStatus({ kind: 'error', message: 'A nova senha precisa ter pelo menos 8 caracteres.' });
+      return;
+    }
+    if (next !== confirmation) {
+      setStatus({ kind: 'error', message: 'A confirmação não bate com a nova senha.' });
+      return;
+    }
+    setIsSubmitting(true);
+    const error = await changePassword(current, next);
+    setIsSubmitting(false);
+    if (error) setStatus({ kind: 'error', message: error });
+  };
+
   return (
-    <AdminPage title="Sem acesso ao painel">
-      <AdminSection title="Esta conta não é administradora">
-        <Text style={{ ...typography.body, color: colors.textMuted }}>
-          {session?.user.email} entrou, mas não tem papel de administrador. Peça à equipe
-          ScanMercado para liberar o acesso (papel tenant_admin ou platform_admin).
-        </Text>
-        <Button label="Sair" variant="secondary" onPress={signOut} />
+    <AdminPage
+      title="Crie sua senha"
+      subtitle={`${profile?.email ?? ''} — você entrou com uma senha temporária. Defina a sua para continuar.`}
+      actions={<Button label="Sair" variant="ghost" onPress={signOut} />}
+    >
+      <AdminSection title="Nova senha">
+        <Field label="Senha temporária" value={current} onChangeText={setCurrent} secureTextEntry />
+        <Field
+          label="Nova senha"
+          value={next}
+          onChangeText={setNext}
+          secureTextEntry
+          autoComplete="new-password"
+          hint="Mínimo de 8 caracteres."
+        />
+        <Field
+          label="Confirme a nova senha"
+          value={confirmation}
+          onChangeText={setConfirmation}
+          secureTextEntry
+          autoComplete="new-password"
+          onSubmitEditing={handleSubmit}
+        />
+        <StatusMessage status={status} />
+        <Button label="Salvar senha" onPress={handleSubmit} loading={isSubmitting} fullWidth />
       </AdminSection>
     </AdminPage>
   );
 }
 
 function AdminGate() {
-  const { isReady, session, profile } = useAdminAuth();
+  const { isReady, profile } = useAdminAuth();
 
   if (!isReady) return <Loading />;
-  if (!session) return <AdminLogin />;
-  if (!profile || profile.role === 'customer') return <NoAccess />;
+  if (!profile) return <AdminLogin />;
+  if (profile.mustChangePassword) return <ChangePassword />;
 
   return <Stack screenOptions={{ headerShown: false }} />;
 }

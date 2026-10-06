@@ -1,4 +1,4 @@
-import type { Session } from '@supabase/supabase-js';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   createContext,
   PropsWithChildren,
@@ -9,17 +9,20 @@ import {
   useState,
 } from 'react';
 
-import { AdminProfile, describeError, fetchMyProfile } from '../services/admin';
-import { supabase } from '../services/supabase';
+import { AdminProfile, describeError } from '../services/admin';
+import { ApiError, apiRequest, isApiAvailable, setAdminToken } from '../services/api';
+
+const STORAGE_KEY = 'scanmercado:admin-token:v1';
 
 type AdminAuthContextValue = {
   isReady: boolean;
-  session: Session | null;
   profile: AdminProfile | null;
   isPlatformAdmin: boolean;
   /** Retorna a mensagem de erro, ou null se entrou. */
   signIn: (email: string, password: string) => Promise<string | null>;
   signOut: () => Promise<void>;
+  /** Retorna a mensagem de erro, ou null se trocou. */
+  changePassword: (currentPassword: string, newPassword: string) => Promise<string | null>;
 };
 
 const AdminAuthContext = createContext<AdminAuthContextValue | undefined>(undefined);
@@ -34,80 +37,112 @@ const DEV_AUTO_LOGIN =
       }
     : null;
 
-/** Login do painel admin — Supabase Auth de verdade (e-mail + senha). */
+type LoginResponse = { token: string; user: AdminProfile };
+
+async function storeToken(token: string | null) {
+  setAdminToken(token);
+  try {
+    if (token) await AsyncStorage.setItem(STORAGE_KEY, token);
+    else await AsyncStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Sem armazenamento (modo privado do navegador): fica só nesta sessão.
+  }
+}
+
+/** Login do painel admin pela API (e-mail + senha). */
 export function AdminAuthProvider({ children }: PropsWithChildren) {
-  const [sessionChecked, setSessionChecked] = useState(false);
-  const [session, setSession] = useState<Session | null>(null);
+  const [isReady, setIsReady] = useState(!isApiAvailable);
   const [profile, setProfile] = useState<AdminProfile | null>(null);
-  // De qual usuário é o profile carregado — evita mostrar "sem acesso"
-  // enquanto o profile de quem acabou de entrar ainda está chegando.
-  const [profileUserId, setProfileUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!supabase) return;
-
-    const client = supabase;
-    client.auth.getSession().then(async ({ data }) => {
-      let current = data.session;
-      // Modo de teste: em desenvolvimento, entra sozinho com a conta do .env
-      // e o painel abre sem tela de login. Build de produção nunca faz isso.
-      if (!current && DEV_AUTO_LOGIN) {
-        const { data: signed, error } = await client.auth.signInWithPassword(DEV_AUTO_LOGIN);
-        if (error) console.warn('Login automático de desenvolvimento falhou:', error.message);
-        current = signed.session;
-      }
-      setSession(current);
-      setSessionChecked(true);
-    });
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
-    });
-    return () => listener.subscription.unsubscribe();
-  }, []);
-
-  const userId = session?.user.id ?? null;
-
-  useEffect(() => {
-    if (!userId) return;
+    if (!isApiAvailable) return;
     let cancelled = false;
-    fetchMyProfile(userId)
-      .catch(() => null)
-      .then((result) => {
-        if (cancelled) return;
-        setProfile(result);
-        setProfileUserId(userId);
-      });
+
+    (async () => {
+      let saved: string | null = null;
+      try {
+        saved = await AsyncStorage.getItem(STORAGE_KEY);
+      } catch {
+        saved = null;
+      }
+
+      let current: AdminProfile | null = null;
+      if (saved) {
+        setAdminToken(saved);
+        try {
+          current = await apiRequest<AdminProfile>('/auth/me', { auth: 'admin' });
+        } catch (err) {
+          // Token vencido/revogado: descarta. Erro de rede: mantém para tentar depois.
+          if (err instanceof ApiError && err.status === 401) await storeToken(null);
+        }
+      }
+
+      // Modo de teste: em desenvolvimento, entra sozinho com a conta do .env.
+      if (!current && DEV_AUTO_LOGIN) {
+        try {
+          const login = await apiRequest<LoginResponse>('/auth/login', { method: 'POST', body: DEV_AUTO_LOGIN });
+          await storeToken(login.token);
+          current = login.user;
+        } catch (err) {
+          console.warn('Login automático de desenvolvimento falhou:', describeError(err));
+        }
+      }
+
+      if (!cancelled) {
+        setProfile(current);
+        setIsReady(true);
+      }
+    })();
+
     return () => {
       cancelled = true;
     };
-  }, [userId]);
-
-  const isReady = !supabase || (sessionChecked && (userId === null || profileUserId === userId));
-  const currentProfile = userId && profileUserId === userId ? profile : null;
+  }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    if (!supabase) return 'Supabase não configurado no .env.';
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-    if (!error) return null;
-    if (error.message.toLowerCase().includes('invalid login')) return 'E-mail ou senha incorretos.';
-    return describeError(error);
+    try {
+      const login = await apiRequest<LoginResponse>('/auth/login', {
+        method: 'POST',
+        body: { email: email.trim(), password },
+      });
+      await storeToken(login.token);
+      setProfile(login.user);
+      return null;
+    } catch (err) {
+      return describeError(err);
+    }
   }, []);
 
   const signOut = useCallback(async () => {
-    await supabase?.auth.signOut();
+    await apiRequest('/auth/logout', { method: 'POST', auth: 'admin' }).catch(() => {});
+    await storeToken(null);
+    setProfile(null);
+  }, []);
+
+  const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
+    try {
+      await apiRequest('/auth/change-password', {
+        method: 'POST',
+        auth: 'admin',
+        body: { currentPassword, newPassword },
+      });
+      setProfile(await apiRequest<AdminProfile>('/auth/me', { auth: 'admin' }));
+      return null;
+    } catch (err) {
+      return describeError(err);
+    }
   }, []);
 
   const value = useMemo<AdminAuthContextValue>(
     () => ({
       isReady,
-      session,
-      profile: currentProfile,
-      isPlatformAdmin: currentProfile?.role === 'platform_admin',
+      profile,
+      isPlatformAdmin: profile?.role === 'platform_admin',
       signIn,
       signOut,
+      changePassword,
     }),
-    [isReady, session, currentProfile, signIn, signOut],
+    [isReady, profile, signIn, signOut, changePassword],
   );
 
   return <AdminAuthContext.Provider value={value}>{children}</AdminAuthContext.Provider>;

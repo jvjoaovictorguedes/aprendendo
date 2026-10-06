@@ -1,10 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, PropsWithChildren, useContext, useEffect, useState } from 'react';
 
-import { appTenantId, isSupabaseConfigured } from '../services/supabase';
+import { isApiConfigured } from '../services/api';
 import {
   DEFAULT_TENANT_SETTINGS,
-  fetchTenantSettings,
+  fetchAppTenantSettings,
   TenantSettings,
 } from '../services/tenantSettings';
 
@@ -14,7 +14,7 @@ const TenantSettingsContext = createContext<TenantSettings>(DEFAULT_TENANT_SETTI
 
 /**
  * Configuração da franquia deste build do app. Começa pelo padrão, troca
- * pela última cópia salva no aparelho e depois pela versão do Supabase —
+ * pela última cópia salva no aparelho e depois pela versão da API —
  * assim o scanner funciona mesmo sem internet.
  */
 export function TenantSettingsProvider({ children }: PropsWithChildren) {
@@ -29,10 +29,10 @@ export function TenantSettingsProvider({ children }: PropsWithChildren) {
       })
       .catch(() => {});
 
-    if (isSupabaseConfigured && appTenantId) {
-      fetchTenantSettings(appTenantId)
+    if (isApiConfigured) {
+      fetchAppTenantSettings()
         .then((remote) => {
-          if (!remote || cancelled) return;
+          if (cancelled) return;
           setSettings(remote);
           AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(remote)).catch(() => {});
         })

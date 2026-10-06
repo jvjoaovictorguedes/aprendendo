@@ -199,8 +199,8 @@ export default function ComprarScreen() {
               <Text style={styles.feedbackTitle}>Produto não cadastrado ({feedback.barcode})</Text>
               <Text style={styles.feedbackOffline}>
                 {feedback.offline
-                  ? '⚠ Buscado no catálogo local — Supabase não conectado'
-                  : '✓ Verificado no Supabase, código não existe na tabela products'}
+                  ? '⚠ Buscado no catálogo local — sem conexão com o servidor'
+                  : '✓ Verificado no catálogo da loja — código não cadastrado'}
               </Text>
             </>
           )}
