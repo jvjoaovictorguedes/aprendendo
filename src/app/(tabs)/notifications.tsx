@@ -1,9 +1,9 @@
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { EmptyState, Icon } from '../components/ui';
-import { useNotifications } from '../context/NotificationsContext';
-import { NotificationItem, NotificationKind } from '../data/notifications';
-import { colors, radius, spacing, typography } from '../theme/tokens';
+import { EmptyState, Icon } from '../../components/ui';
+import { useNotifications } from '../../context/NotificationsContext';
+import { NotificationItem, NotificationKind } from '../../data/notifications';
+import { colors, radius, spacing, typography } from '../../theme/tokens';
 
 const KIND_ICON: Record<NotificationKind, Parameters<typeof Icon>[0]['name']> = {
   coupon: 'tag',

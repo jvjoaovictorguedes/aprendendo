@@ -4,21 +4,27 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 
-import { Button, Icon } from '../components/ui';
-import { useBudget } from '../context/BudgetContext';
-import { useCart } from '../context/CartContext';
-import { useLists } from '../context/ListsContext';
-import { useNotifications } from '../context/NotificationsContext';
-import { usePromotions } from '../context/PromotionsContext';
-import { colors, radius, spacing, typography } from '../theme/tokens';
-import { computeCartTotals, formatBRL } from '../utils/pricing';
-
-const SCAN_COOLDOWN_MS = 1200;
-const BUDGET_WARNING_THRESHOLD = 0.9;
+import { Button, Icon } from '../../components/ui';
+import { useBudget } from '../../context/BudgetContext';
+import { useCart } from '../../context/CartContext';
+import { useLists } from '../../context/ListsContext';
+import { useNotifications } from '../../context/NotificationsContext';
+import { usePromotions } from '../../context/PromotionsContext';
+import { useTenantSettings } from '../../context/TenantSettingsContext';
+import { colors, radius, spacing, typography } from '../../theme/tokens';
+import { computeCartTotals, formatBRL, formatKg } from '../../utils/pricing';
 
 type Feedback =
   | { type: 'checking' }
-  | { type: 'added'; barcode: string; name: string; price: string; fromList?: string; offline?: boolean }
+  | {
+      type: 'added';
+      key: string;
+      name: string;
+      price: string;
+      weight?: string;
+      fromList?: string;
+      offline?: boolean;
+    }
   | { type: 'not_found'; barcode: string; offline?: boolean };
 
 export default function ComprarScreen() {
@@ -30,6 +36,8 @@ export default function ComprarScreen() {
   const { markBoughtByBarcode, activeListId, lists } = useLists();
   const { limit } = useBudget();
   const { notify } = useNotifications();
+  const { scanCooldownMs, budgetWarningPercent } = useTenantSettings();
+  const budgetWarningThreshold = budgetWarningPercent / 100;
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const lockRef = useRef(false);
   const feedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -54,7 +62,7 @@ export default function ComprarScreen() {
         body: `Sua compra já passou do limite de ${formatBRL(limit)}.`,
         kind: 'budget',
       });
-    } else if (totals.finalTotal / limit >= BUDGET_WARNING_THRESHOLD && !hasWarnedRef.current) {
+    } else if (totals.finalTotal / limit >= budgetWarningThreshold && !hasWarnedRef.current) {
       hasWarnedRef.current = true;
       notify({
         title: 'Atenção ao orçamento',
@@ -62,15 +70,15 @@ export default function ComprarScreen() {
         kind: 'budget',
       });
     }
-  }, [totals.finalTotal, limit, notify]);
+  }, [totals.finalTotal, limit, notify, budgetWarningThreshold]);
 
   const clearFeedbackLater = useCallback(() => {
     if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
     feedbackTimeoutRef.current = setTimeout(() => {
       lockRef.current = false;
       setFeedback(null);
-    }, SCAN_COOLDOWN_MS);
-  }, []);
+    }, scanCooldownMs);
+  }, [scanCooldownMs]);
 
   const handleScanned = useCallback(
     async (result: BarcodeScanningResult) => {
@@ -82,12 +90,15 @@ export default function ComprarScreen() {
 
       if (outcome.status === 'added') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-        const listMatch = markBoughtByBarcode(result.data);
+        const listMatch = markBoughtByBarcode(outcome.product.barcode);
         setFeedback({
           type: 'added',
-          barcode: result.data,
+          key: outcome.key,
           name: outcome.product.name,
-          price: formatBRL(outcome.product.price),
+          price: formatBRL(outcome.weighed ? outcome.weighed.labelTotal : outcome.product.price),
+          weight: outcome.weighed
+            ? formatKg(outcome.weighed.weightKg, outcome.weighed.weightIsEstimated)
+            : undefined,
           fromList: listMatch?.listName,
           offline: outcome.source === 'mock',
         });
@@ -107,7 +118,7 @@ export default function ComprarScreen() {
 
   const handleUndo = useCallback(() => {
     if (feedback?.type !== 'added') return;
-    decrementItem(feedback.barcode);
+    decrementItem(feedback.key);
     if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
     lockRef.current = false;
     setFeedback(null);
@@ -115,7 +126,7 @@ export default function ComprarScreen() {
 
   const budgetRemaining = limit != null ? limit - totals.finalTotal : null;
   const isNearBudget =
-    limit != null && budgetRemaining != null && totals.finalTotal / limit >= BUDGET_WARNING_THRESHOLD;
+    limit != null && budgetRemaining != null && totals.finalTotal / limit >= budgetWarningThreshold;
 
   if (!permission) {
     return <View style={styles.center} />;
@@ -168,7 +179,10 @@ export default function ComprarScreen() {
               <Text style={styles.feedbackTitle}>✓ Produto adicionado</Text>
               <Text style={styles.feedbackName}>{feedback.name}</Text>
               <View style={styles.feedbackRow}>
-                <Text style={styles.feedbackPrice}>{feedback.price}</Text>
+                <Text style={styles.feedbackPrice}>
+                  {feedback.weight ? `${feedback.weight} · ` : ''}
+                  {feedback.price}
+                </Text>
                 <TouchableOpacity onPress={handleUndo} hitSlop={8}>
                   <Text style={styles.feedbackUndo}>Desfazer</Text>
                 </TouchableOpacity>

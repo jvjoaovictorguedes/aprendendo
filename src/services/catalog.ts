@@ -1,4 +1,7 @@
-import { findProductByBarcode as findMockProductByBarcode } from '../data/products';
+import {
+  findProductByBarcode as findMockProductByBarcode,
+  findProductByPlu as findMockProductByPlu,
+} from '../data/products';
 import { Product, Promotion } from '../types';
 import { isSupabaseConfigured, supabase } from './supabase';
 
@@ -13,13 +16,17 @@ type PromotionRow = {
 };
 
 type ProductRow = {
-  barcode: string;
+  barcode: string | null;
+  plu: string | null;
   name: string;
   price: number;
   unit: 'un' | 'kg';
   category: string;
   promotions: PromotionRow[] | null;
 };
+
+const PRODUCT_COLUMNS =
+  'barcode, plu, name, price, unit, category, promotions(kind, label, percent, buy_qty, pay_qty, fixed_price, active)';
 
 function mapPromotionRow(row: PromotionRow | undefined): Promotion | undefined {
   if (!row) return undefined;
@@ -38,7 +45,8 @@ function mapPromotionRow(row: PromotionRow | undefined): Promotion | undefined {
 function mapProductRow(row: ProductRow): Product {
   const activePromotion = (row.promotions ?? []).find((promo) => promo.active !== false);
   return {
-    barcode: row.barcode,
+    barcode: row.barcode ?? `plu:${row.plu}`,
+    plu: row.plu ?? undefined,
     name: row.name,
     price: Number(row.price),
     unit: row.unit,
@@ -55,23 +63,25 @@ export type CatalogLookupResult = {
 };
 
 /**
- * Busca um produto pelo código de barras.
+ * Busca um produto numa coluna do catálogo (barcode ou plu).
  * Usa o Supabase quando configurado (EXPO_PUBLIC_SUPABASE_URL/EXPO_PUBLIC_SUPABASE_ANON_KEY);
  * cai para o catálogo mock local se o Supabase não estiver configurado, ou se a
  * chamada falhar (sem internet, erro de rede) — o scanner nunca trava sem resposta.
  */
-export async function fetchProductByBarcode(barcode: string): Promise<CatalogLookupResult> {
+async function lookupProduct(
+  column: 'barcode' | 'plu',
+  code: string,
+  findMock: (code: string) => Product | undefined,
+): Promise<CatalogLookupResult> {
   if (!isSupabaseConfigured || !supabase) {
-    return { product: findMockProductByBarcode(barcode) ?? null, source: 'mock' };
+    return { product: findMock(code) ?? null, source: 'mock' };
   }
 
   try {
     const { data, error } = await supabase
       .from('products')
-      .select(
-        'barcode, name, price, unit, category, promotions(kind, label, percent, buy_qty, pay_qty, fixed_price, active)',
-      )
-      .eq('barcode', barcode)
+      .select(PRODUCT_COLUMNS)
+      .eq(column, code)
       .eq('active', true)
       .maybeSingle<ProductRow>();
 
@@ -80,8 +90,16 @@ export async function fetchProductByBarcode(barcode: string): Promise<CatalogLoo
 
     return { product: mapProductRow(data), source: 'supabase' };
   } catch (err) {
-     
     console.warn('Falha ao consultar o Supabase, usando catálogo local como alternativa:', err);
-    return { product: findMockProductByBarcode(barcode) ?? null, source: 'mock' };
+    return { product: findMock(code) ?? null, source: 'mock' };
   }
+}
+
+export function fetchProductByBarcode(barcode: string): Promise<CatalogLookupResult> {
+  return lookupProduct('barcode', barcode, findMockProductByBarcode);
+}
+
+/** Produto pesado, pelo PLU lido da etiqueta da balança. */
+export function fetchProductByPlu(plu: string): Promise<CatalogLookupResult> {
+  return lookupProduct('plu', plu, findMockProductByPlu);
 }

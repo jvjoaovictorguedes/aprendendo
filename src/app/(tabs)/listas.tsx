@@ -2,10 +2,10 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
-import { Badge, Button, Card, EmptyState } from '../components/ui';
-import { useLists } from '../context/ListsContext';
-import { findProductByName } from '../data/products';
-import { colors, radius, spacing, typography } from '../theme/tokens';
+import { Badge, Button, Card, EmptyState } from '../../components/ui';
+import { useLists } from '../../context/ListsContext';
+import { findProductByName } from '../../data/products';
+import { colors, radius, spacing, typography } from '../../theme/tokens';
 
 export default function ListsScreen() {
   const router = useRouter();

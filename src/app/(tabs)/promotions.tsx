@@ -2,14 +2,14 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { Icon } from '../components/ui';
-import { useAuth } from '../context/AuthContext';
-import { usePromotions } from '../context/PromotionsContext';
-import { MEMBER_PROMOTIONS } from '../data/memberPromotions';
-import { MOCK_PRODUCTS } from '../data/products';
-import { colors, radius, spacing, typography } from '../theme/tokens';
-import { formatBRL } from '../utils/pricing';
-import { getTierProgress } from '../utils/loyalty';
+import { Icon } from '../../components/ui';
+import { useAuth } from '../../context/AuthContext';
+import { usePromotions } from '../../context/PromotionsContext';
+import { MEMBER_PROMOTIONS } from '../../data/memberPromotions';
+import { MOCK_PRODUCTS } from '../../data/products';
+import { colors, radius, spacing, typography } from '../../theme/tokens';
+import { formatBRL } from '../../utils/pricing';
+import { getTierProgress } from '../../utils/loyalty';
 
 const storePromotions = MOCK_PRODUCTS.filter((product) => product.promotion);
 const CATEGORIES = ['Todos', ...Array.from(new Set(storePromotions.map((product) => product.category)))];

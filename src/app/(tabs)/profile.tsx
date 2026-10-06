@@ -13,16 +13,16 @@ import {
   View,
 } from 'react-native';
 
-import { Button, Card, Icon } from '../components/ui';
-import { useAuth } from '../context/AuthContext';
-import { useBudget } from '../context/BudgetContext';
-import { useFavorites } from '../context/FavoritesContext';
-import { useHistory } from '../context/HistoryContext';
-import { useNotifications } from '../context/NotificationsContext';
-import { findProductByBarcode } from '../data/products';
-import { colors, radius, spacing, typography } from '../theme/tokens';
-import { getTierProgress } from '../utils/loyalty';
-import { formatBRL } from '../utils/pricing';
+import { Button, Card, Icon } from '../../components/ui';
+import { useAuth } from '../../context/AuthContext';
+import { useBudget } from '../../context/BudgetContext';
+import { useFavorites } from '../../context/FavoritesContext';
+import { useHistory } from '../../context/HistoryContext';
+import { useNotifications } from '../../context/NotificationsContext';
+import { findProductByBarcode } from '../../data/products';
+import { colors, radius, spacing, typography } from '../../theme/tokens';
+import { getTierProgress } from '../../utils/loyalty';
+import { formatBRL } from '../../utils/pricing';
 
 function formatCpfInput(value: string): string {
   return value.replace(/\D/g, '').slice(0, 11);
@@ -212,6 +212,8 @@ export default function ProfileScreen() {
             />
           </View>
           <View style={styles.menuDivider} />
+          <MenuRow icon="briefcase" label="Área do lojista" onPress={() => router.push('/admin')} />
+          <View style={styles.menuDivider} />
           <MenuRow
             icon="help-circle"
             label="Ajuda e suporte"
@@ -285,6 +287,13 @@ export default function ProfileScreen() {
         <Text style={styles.demoHint}>Login de teste: CPF 12345678900, senha 123456</Text>
 
         <BudgetSection />
+
+        <Button
+          label="Área do lojista"
+          variant="ghost"
+          onPress={() => router.push('/admin')}
+          style={{ marginTop: spacing.lg }}
+        />
       </ScrollView>
     </KeyboardAvoidingView>
   );

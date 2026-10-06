@@ -1,14 +1,15 @@
 import { useRouter } from 'expo-router';
 import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 
-import { ProductRow } from '../components/ProductRow';
-import { Button, EmptyState } from '../components/ui';
-import { useCart } from '../context/CartContext';
-import { useFavorites } from '../context/FavoritesContext';
-import { useHistory } from '../context/HistoryContext';
-import { usePromotions } from '../context/PromotionsContext';
-import { colors, spacing, typography } from '../theme/tokens';
-import { computeCartTotals, formatBRL } from '../utils/pricing';
+import { ProductRow } from '../../components/ProductRow';
+import { Button, EmptyState } from '../../components/ui';
+import { useCart } from '../../context/CartContext';
+import { useFavorites } from '../../context/FavoritesContext';
+import { useHistory } from '../../context/HistoryContext';
+import { usePromotions } from '../../context/PromotionsContext';
+import { colors, spacing, typography } from '../../theme/tokens';
+import { cartItemKey } from '../../types';
+import { computeCartTotals, formatBRL } from '../../utils/pricing';
 
 export default function CartScreen() {
   const router = useRouter();
@@ -65,16 +66,16 @@ export default function CartScreen() {
     <View style={styles.container}>
       <FlatList
         data={items}
-        keyExtractor={(item) => item.product.barcode}
+        keyExtractor={cartItemKey}
         renderItem={({ item }) => (
           <ProductRow
             item={item}
             extraPercentOff={extraPercentOffFor(item.product.barcode)}
             isFavorite={isFavorite(item.product.barcode)}
             onToggleFavorite={() => toggleFavorite(item.product.barcode)}
-            onIncrement={() => incrementItem(item.product.barcode)}
-            onDecrement={() => decrementItem(item.product.barcode)}
-            onRemove={() => removeItem(item.product.barcode)}
+            onIncrement={() => incrementItem(cartItemKey(item))}
+            onDecrement={() => decrementItem(cartItemKey(item))}
+            onRemove={() => removeItem(cartItemKey(item))}
           />
         )}
         contentContainerStyle={{ paddingBottom: spacing.md }}

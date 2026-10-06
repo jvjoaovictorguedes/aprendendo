@@ -1,0 +1,52 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createContext, PropsWithChildren, useContext, useEffect, useState } from 'react';
+
+import { appTenantId, isSupabaseConfigured } from '../services/supabase';
+import {
+  DEFAULT_TENANT_SETTINGS,
+  fetchTenantSettings,
+  TenantSettings,
+} from '../services/tenantSettings';
+
+const STORAGE_KEY = 'scanmercado:tenant-settings:v1';
+
+const TenantSettingsContext = createContext<TenantSettings>(DEFAULT_TENANT_SETTINGS);
+
+/**
+ * Configuração da franquia deste build do app. Começa pelo padrão, troca
+ * pela última cópia salva no aparelho e depois pela versão do Supabase —
+ * assim o scanner funciona mesmo sem internet.
+ */
+export function TenantSettingsProvider({ children }: PropsWithChildren) {
+  const [settings, setSettings] = useState<TenantSettings>(DEFAULT_TENANT_SETTINGS);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    AsyncStorage.getItem(STORAGE_KEY)
+      .then((raw) => {
+        if (raw && !cancelled) setSettings(JSON.parse(raw));
+      })
+      .catch(() => {});
+
+    if (isSupabaseConfigured && appTenantId) {
+      fetchTenantSettings(appTenantId)
+        .then((remote) => {
+          if (!remote || cancelled) return;
+          setSettings(remote);
+          AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(remote)).catch(() => {});
+        })
+        .catch((err) => console.warn('Não foi possível carregar a configuração da franquia:', err));
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return <TenantSettingsContext.Provider value={settings}>{children}</TenantSettingsContext.Provider>;
+}
+
+export function useTenantSettings(): TenantSettings {
+  return useContext(TenantSettingsContext);
+}

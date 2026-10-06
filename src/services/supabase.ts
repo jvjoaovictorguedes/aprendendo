@@ -1,4 +1,5 @@
 import 'react-native-url-polyfill/auto';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
@@ -7,28 +8,33 @@ const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 // próprio catálogo no mesmo banco compartilhado — esse header é o que o
 // RLS do SCHEMA.sql usa (public.request_tenant_id()) pra nunca misturar o
 // catálogo de uma franquia com o de outra, mesmo sem login.
-const tenantId = process.env.EXPO_PUBLIC_TENANT_ID;
+export const appTenantId = process.env.EXPO_PUBLIC_TENANT_ID || null;
 
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey && tenantId);
+/** Há um projeto Supabase configurado (o painel admin precisa só disso). */
+export const isSupabaseAvailable = Boolean(supabaseUrl && supabaseAnonKey);
+
+/** O app do cliente consulta o catálogo real (precisa também da franquia). */
+export const isSupabaseConfigured = Boolean(isSupabaseAvailable && appTenantId);
 
 if (!isSupabaseConfigured) {
-
   console.warn(
     'Supabase não configurado (EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY / EXPO_PUBLIC_TENANT_ID ausentes). ' +
       'O app vai usar o catálogo local (src/data/products.ts) como alternativa.',
   );
 }
 
-export const supabase = isSupabaseConfigured
+export const supabase = isSupabaseAvailable
   ? createClient(supabaseUrl as string, supabaseAnonKey as string, {
       auth: {
-        // Autenticação do app é feita por conta própria (AuthContext); não
-        // precisamos do sistema de auth do Supabase nem de persistir sessão dele.
-        persistSession: false,
-        autoRefreshToken: false,
+        // Só o painel admin faz login pelo Supabase Auth; o cliente do app
+        // ainda usa o login próprio (AuthContext).
+        storage: AsyncStorage,
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: false,
       },
       global: {
-        headers: { 'x-tenant-id': tenantId as string },
+        headers: appTenantId ? { 'x-tenant-id': appTenantId } : {},
       },
     })
   : null;

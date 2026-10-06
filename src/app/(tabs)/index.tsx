@@ -3,17 +3,17 @@ import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
-import { Badge, Button, Card, Icon, Section } from '../components/ui';
-import { useAuth } from '../context/AuthContext';
-import { useCart } from '../context/CartContext';
-import { useHistory } from '../context/HistoryContext';
-import { useLists } from '../context/ListsContext';
-import { useNotifications } from '../context/NotificationsContext';
-import { usePromotions } from '../context/PromotionsContext';
-import { MEMBER_PROMOTIONS } from '../data/memberPromotions';
-import { MOCK_PRODUCTS } from '../data/products';
-import { colors, radius, spacing, typography } from '../theme/tokens';
-import { computeCartTotals, formatBRL } from '../utils/pricing';
+import { Badge, Button, Card, Icon, Section } from '../../components/ui';
+import { useAuth } from '../../context/AuthContext';
+import { useCart } from '../../context/CartContext';
+import { useHistory } from '../../context/HistoryContext';
+import { useLists } from '../../context/ListsContext';
+import { useNotifications } from '../../context/NotificationsContext';
+import { usePromotions } from '../../context/PromotionsContext';
+import { MEMBER_PROMOTIONS } from '../../data/memberPromotions';
+import { MOCK_PRODUCTS } from '../../data/products';
+import { colors, radius, spacing, typography } from '../../theme/tokens';
+import { computeCartTotals, formatBRL } from '../../utils/pricing';
 
 const storeOffers = MOCK_PRODUCTS.filter((product) => product.promotion).slice(0, 3);
 

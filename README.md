@@ -10,6 +10,7 @@ App mobile (Expo / React Native) para clientes de supermercado. O cliente **bipa
 - Leitura de código de barras (EAN-13, EAN-8, UPC-A, UPC-E, Code128) pela câmera, usando `expo-camera`, com feedback imediato (nome, preço, **desfazer**) e háptico a cada bipagem.
 - Busca de produto **real no Supabase** quando configurado (ver seção abaixo), com fallback automático pro catálogo local se o Supabase não estiver configurado ou a chamada falhar — o scanner nunca trava esperando resposta.
 - Cada bipagem soma automaticamente ao carrinho (produto repetido = quantidade +1).
+- **Etiqueta de balança** (hortifrúti, açougue, frios): o cliente pesa o produto, a balança imprime um EAN-13 de peso variável com o PLU e o preço (ou peso) embutidos, e o app lê o valor direto do código. Cada produto é cadastrado **uma vez só** (PLU + preço do kg) — qualquer peso funciona. O formato da etiqueta é configurável por franquia (ver "Painel admin").
 - Câmera pausa automaticamente quando a aba não está em foco (bateria/privacidade).
 - Tela **Carrinho** com lista dos itens, favoritar, ajuste manual de quantidade, remoção e total com hierarquia visual forte.
 - Motor de promoções: `% OFF`, `leve X pague Y` e `preço fixo promocional` (gerais da loja), mais **ofertas exclusivas de cliente logado** que se ativam na aba Promoções e empilham sobre a promoção geral.
@@ -30,7 +31,9 @@ App mobile (Expo / React Native) para clientes de supermercado. O cliente **bipa
 O banco agora é **multi-tenant**: um projeto Supabase só, compartilhado por várias franquias (ver "Banco de dados" abaixo). Cada build do app representa UMA franquia, identificada por `EXPO_PUBLIC_TENANT_ID`.
 
 1. Crie um projeto grátis em [supabase.com](https://supabase.com).
-2. No **SQL Editor**, rode o arquivo [`SCHEMA.sql`](./SCHEMA.sql) inteiro (cria tenants, profiles, products, promotions etc., ativa RLS em tudo, e popula a franquia piloto com os mesmos produtos do mock). No fim do arquivo tem um passo manual (bootstrap do seu usuário platform_admin) — não pule.
+2. No **SQL Editor**, rode o arquivo [`SCHEMA.sql`](./SCHEMA.sql) inteiro (cria tenants, profiles, products, promotions etc., ativa RLS em tudo, e popula a franquia piloto com os mesmos produtos do mock). Depois rode, em ordem, cada arquivo de [`supabase/migrations/`](./supabase/migrations) (uma vez só). No fim do `SCHEMA.sql` tem um passo manual (bootstrap do seu usuário platform_admin) — não pule.
+
+   Banco que **já existia** antes do painel admin: rode só [`supabase/migrations/001_balanca_config_franquia_admin.sql`](./supabase/migrations/001_balanca_config_franquia_admin.sql). Ela adiciona o PLU, a tabela `tenant_settings` e corrige duas falhas de RLS (cliente logado conseguia editar catálogo da própria franquia e se promover a admin).
 3. Em **Project Settings → API**, copie a `Project URL` e a chave `anon public`.
 4. Copie `.env.example` para `.env` na raiz do projeto e preencha:
    ```
@@ -76,16 +79,33 @@ Tabelas principais:
 
 **Importante sobre segurança:** mesmo multi-tenant, o app mobile só fala direto com o banco pra leitura pública do catálogo (anon key + RLS). Login, carrinho sincronizado e qualquer escrita sensível devem passar por Supabase Auth + RLS de verdade (já no schema) — nunca confie só em filtro feito no app. O passo de "BOOTSTRAP" no fim do `SCHEMA.sql` promove sua primeira conta a `platform_admin`; sem isso ninguém gerencia franquia nenhuma.
 
+## Painel admin (mobile e web)
+
+Fica no próprio app, em `/admin` — no celular pela aba **Conta → Área do lojista**, no navegador direto pela URL (`npx expo start --web` e abra `http://localhost:8081/admin`). Login com **e-mail e senha do Supabase Auth**; só entra quem tem papel `platform_admin` ou `tenant_admin` (ver bootstrap no fim do `SCHEMA.sql`).
+
+| Tela | O que configura |
+|---|---|
+| Franquias | Lista e cria franquias (só `platform_admin`). `tenant_admin` cai direto na própria franquia. |
+| Produtos | Catálogo: nome, categoria, preço (ou preço do kg), EAN, **PLU da balança**, ativo/inativo. |
+| Balança | Formato da etiqueta: prefixo, dígitos do PLU, se o código traz **preço total ou peso**, dígitos/casas do valor, conferência do dígito verificador. Tem modelos prontos, desenho do layout e **simulador** (gera uma etiqueta ou lê uma colada e mostra produto, peso e valor). |
+| Regras do app | % do orçamento para avisar o cliente e intervalo entre bipagens. |
+| Marca e dados | Nome, cor e logo (dono da franquia edita); plano, status, slug e território (só `platform_admin` — o banco recusa o resto). |
+
+Tudo que é por franquia fica na tabela `tenant_settings`. O app do cliente baixa a configuração da franquia dele ao abrir (e guarda no aparelho, para funcionar sem internet).
+
 ## Navegação
 
 5 abas: **Início** · **Ofertas** · **Comprar** (scanner, botão elevado no centro) · **Listas** · **Conta** (perfil + cartão de fidelidade + favoritos + histórico + notificações, tudo unificado).
-Carrinho, Lojas e Notificações continuam existindo como telas de verdade, só não ficam na barra de abas — ver `href: null` em `src/app/_layout.tsx`.
+Carrinho, Lojas e Notificações continuam existindo como telas de verdade, só não ficam na barra de abas — ver `href: null` em `src/app/(tabs)/_layout.tsx`.
 
 ## Estrutura do projeto
 
 ```
 src/
   app/              # telas/rotas (Expo Router)
+    _layout.tsx       # providers + Stack com (tabs) e admin
+    admin/            # painel admin (login, franquias, produtos, balança, regras, marca)
+    (tabs)/           # app do cliente (o grupo não aparece na URL)
     index.tsx         # Início
     comprar.tsx        # Scanner (câmera) — núcleo do Scan & Go
     promotions.tsx      # Ofertas (cupons + promoções da loja)
@@ -104,7 +124,9 @@ src/
   data/               # catálogo, usuários, ofertas, notificações e lojas mock
   theme/tokens.ts      # cores, espaçamento, radius, tipografia, sombras
   types.ts             # tipos compartilhados
-  utils/pricing.ts     # cálculo de totais e promoções
+  utils/pricing.ts     # cálculo de totais e promoções (arredonda por linha, como o PDV)
+  utils/scaleLabel.ts  # leitura/geração da etiqueta de balança (layout parametrizável)
+  services/            # Supabase: catálogo, tenant_settings, dados do admin
   utils/loyalty.ts     # nível de fidelidade (Bronze/Prata/Ouro) a partir dos pontos
 ```
 

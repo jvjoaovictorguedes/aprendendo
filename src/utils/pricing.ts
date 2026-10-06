@@ -6,14 +6,26 @@ export type LineTotal = {
   savings: number;
 };
 
+export function roundCents(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
 export function computeLineTotal(item: CartItem, extraPercentOff = 0): LineTotal {
-  const { product, quantity } = item;
-  const originalTotal = product.price * quantity;
+  const { product, quantity, weighed } = item;
+  const originalTotal = weighed ? weighed.labelTotal * quantity : product.price * quantity;
   const promotion = product.promotion;
 
   let finalTotal = originalTotal;
 
-  if (promotion) {
+  if (weighed) {
+    // Etiqueta de balança: o preço/kg da promoção vale sobre o peso;
+    // "leve X pague Y" não se aplica a produto pesado.
+    if (promotion?.kind === 'percentOff') {
+      finalTotal = originalTotal * (1 - promotion.percent / 100);
+    } else if (promotion?.kind === 'fixedPrice') {
+      finalTotal = Math.min(originalTotal, promotion.price * weighed.weightKg * quantity);
+    }
+  } else if (promotion) {
     switch (promotion.kind) {
       case 'percentOff':
         finalTotal = originalTotal * (1 - promotion.percent / 100);
@@ -37,10 +49,14 @@ export function computeLineTotal(item: CartItem, extraPercentOff = 0): LineTotal
     finalTotal = finalTotal * (1 - extraPercentOff / 100);
   }
 
+  // Arredonda por linha, como o PDV faz — evita diferença de centavos no total.
+  const roundedOriginal = roundCents(originalTotal);
+  const roundedFinal = roundCents(finalTotal);
+
   return {
-    originalTotal,
-    finalTotal,
-    savings: Math.max(0, originalTotal - finalTotal),
+    originalTotal: roundedOriginal,
+    finalTotal: roundedFinal,
+    savings: Math.max(0, roundCents(roundedOriginal - roundedFinal)),
   };
 }
 
@@ -68,6 +84,15 @@ export function computeCartTotals(
     },
     { itemCount: 0, originalTotal: 0, finalTotal: 0, savings: 0 },
   );
+}
+
+/** "1,250 kg", ou "≈ 1,250 kg" quando o peso foi calculado a partir do preço. */
+export function formatKg(weightKg: number, estimated = false): string {
+  const formatted = weightKg.toLocaleString('pt-BR', {
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
+  });
+  return `${estimated ? '≈ ' : ''}${formatted} kg`;
 }
 
 export function formatBRL(value: number): string {

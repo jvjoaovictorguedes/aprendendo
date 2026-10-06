@@ -100,6 +100,7 @@ export const MOCK_PRODUCTS: Product[] = [
   },
   {
     barcode: '7891000700109',
+    plu: '1001',
     name: 'Maçã Gala (kg)',
     price: 7.99,
     unit: 'kg',
@@ -107,6 +108,7 @@ export const MOCK_PRODUCTS: Product[] = [
   },
   {
     barcode: '7891000700208',
+    plu: '1002',
     name: 'Banana Prata (kg)',
     price: 5.49,
     unit: 'kg',
@@ -123,4 +125,8 @@ export function findProductByName(name: string): Product | undefined {
 
 export function findProductByBarcode(barcode: string): Product | undefined {
   return MOCK_PRODUCTS.find((product) => product.barcode === barcode);
+}
+
+export function findProductByPlu(plu: string): Product | undefined {
+  return MOCK_PRODUCTS.find((product) => product.plu === plu);
 }

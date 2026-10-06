@@ -2,12 +2,24 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { Badge, Button, Card, EmptyState } from '../components/ui';
-import { useCart } from '../context/CartContext';
-import { useHistory } from '../context/HistoryContext';
-import { Purchase } from '../types';
-import { colors, spacing, typography } from '../theme/tokens';
-import { formatBRL } from '../utils/pricing';
+import { Badge, Button, Card, EmptyState } from '../../components/ui';
+import { useCart } from '../../context/CartContext';
+import { useHistory } from '../../context/HistoryContext';
+import { CartItem, cartItemKey, Purchase } from '../../types';
+import { colors, spacing, typography } from '../../theme/tokens';
+import { formatBRL, formatKg } from '../../utils/pricing';
+
+function itemDescription(item: CartItem): string {
+  if (item.weighed) {
+    const weight = formatKg(item.weighed.weightKg, item.weighed.weightIsEstimated);
+    return `${item.quantity}x ${weight} (${formatBRL(item.product.price)}/kg)`;
+  }
+  return `${item.quantity}x ${formatBRL(item.product.price)}`;
+}
+
+function itemSubtotal(item: CartItem): number {
+  return (item.weighed ? item.weighed.labelTotal : item.product.price) * item.quantity;
+}
 
 export default function HistoryScreen() {
   const router = useRouter();
@@ -18,7 +30,10 @@ export default function HistoryScreen() {
 
   const handleBuyAgain = async (purchase: Purchase) => {
     setIsBuyingAgain(true);
-    for (const item of purchase.items) {
+    // Produto pesado depende de uma etiqueta nova da balança — não dá pra repetir.
+    const repeatable = purchase.items.filter((item) => !item.weighed);
+    const skipped = purchase.items.length - repeatable.length;
+    for (const item of repeatable) {
       for (let i = 0; i < item.quantity; i += 1) {
          
         await addByBarcode(item.product.barcode);
@@ -27,7 +42,10 @@ export default function HistoryScreen() {
     setIsBuyingAgain(false);
     Alert.alert(
       'Itens adicionados',
-      `${purchase.items.length} produto(s) dessa compra foram adicionados ao seu carrinho atual, com os preços de hoje.`,
+      `${repeatable.length} produto(s) dessa compra foram adicionados ao seu carrinho atual, com os preços de hoje.` +
+        (skipped > 0
+          ? ` ${skipped} item(ns) pesado(s) na balança ficaram de fora — pese de novo na loja.`
+          : ''),
       [{ text: 'Ver carrinho', onPress: () => router.push('/cart') }],
     );
   };
@@ -66,16 +84,12 @@ export default function HistoryScreen() {
 
         <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm }}>
           {selected.items.map((item) => (
-            <Card key={item.product.barcode} style={styles.itemRow}>
+            <Card key={cartItemKey(item)} style={styles.itemRow}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.itemName}>{item.product.name}</Text>
-                <Text style={styles.itemQty}>
-                  {item.quantity}x {formatBRL(item.product.price)}
-                </Text>
+                <Text style={styles.itemQty}>{itemDescription(item)}</Text>
               </View>
-              <Text style={styles.itemSubtotal}>
-                {formatBRL(item.product.price * item.quantity)}
-              </Text>
+              <Text style={styles.itemSubtotal}>{formatBRL(itemSubtotal(item))}</Text>
             </Card>
           ))}
         </ScrollView>

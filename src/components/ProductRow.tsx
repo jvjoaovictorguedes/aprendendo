@@ -3,7 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Icon } from './ui';
 import { colors, radius, spacing, typography } from '../theme/tokens';
 import { CartItem } from '../types';
-import { computeLineTotal, formatBRL } from '../utils/pricing';
+import { computeLineTotal, formatBRL, formatKg } from '../utils/pricing';
 
 type Props = {
   item: CartItem;
@@ -43,6 +43,12 @@ export function ProductRow({
         <Text style={styles.unitPrice}>
           {formatBRL(item.product.price)} / {item.product.unit}
         </Text>
+        {item.weighed ? (
+          <Text style={styles.unitPrice}>
+            Balança: {formatKg(item.weighed.weightKg, item.weighed.weightIsEstimated)} ·{' '}
+            {formatBRL(item.weighed.labelTotal)}
+          </Text>
+        ) : null}
         {item.product.promotion ? (
           <Text style={styles.promoLabel}>{item.product.promotion.label}</Text>
         ) : null}

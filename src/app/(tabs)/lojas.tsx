@@ -1,8 +1,8 @@
 import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { Icon } from '../components/ui';
-import { STORES } from '../data/stores';
-import { colors, radius, spacing, typography } from '../theme/tokens';
+import { Icon } from '../../components/ui';
+import { STORES } from '../../data/stores';
+import { colors, radius, spacing, typography } from '../../theme/tokens';
 
 export default function StoresScreen() {
   const openMaps = (mapsQuery: string) => {

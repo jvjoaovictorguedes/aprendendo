@@ -18,11 +18,13 @@
     "expo-status-bar": "~57.0.1",
     "expo-updates": "~57.0.24",
     "react": "19.2.3",
+    "react-dom": "19.2.3",
     "react-native": "0.86.3",
     "react-native-gesture-handler": "^3.3.0",
     "react-native-safe-area-context": "^5.10.1",
     "react-native-screens": "^4.28.0",
-    "react-native-url-polyfill": "^4.0.0"
+    "react-native-url-polyfill": "^4.0.0",
+    "react-native-web": "^0.21.2"
   },
   "overrides": {
     "react-dom": "19.2.3"

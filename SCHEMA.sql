@@ -6,7 +6,8 @@
 -- reforçado por Row Level Security (RLS), não só por filtro no app.
 --
 -- Rode este arquivo inteiro num Postgres vazio (Supabase > SQL Editor).
--- Depois de rodar, veja o bloco "BOOTSTRAP" no final — é o único passo
+-- Em seguida rode, em ordem, os arquivos de supabase/migrations/ (cada um
+-- uma vez só). Depois veja o bloco "BOOTSTRAP" no final — é o único passo
 -- manual (promover seu primeiro usuário a platform_admin).
 
 -- ============================================================
@@ -551,4 +552,11 @@ insert into public.member_promotions (tenant_id, product_id, label, extra_percen
 --
 -- Sem isso, ninguém consegue gerenciar franquias: toda conta nasce
 -- como 'customer' (ver handle_new_user acima).
+--
+-- 3. (Opcional) Para dar acesso ao painel admin ao dono de UMA franquia,
+--    crie a conta dele do mesmo jeito e rode:
+--
+--    update public.profiles
+--    set role = 'tenant_admin', tenant_id = 'UUID-DA-FRANQUIA'
+--    where id = 'UUID-DA-CONTA';
 -- ============================================================
