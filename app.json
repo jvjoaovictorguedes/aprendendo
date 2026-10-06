@@ -35,7 +35,8 @@
         {
           "cameraPermission": "Precisamos da câmera para ler o código de barras dos produtos."
         }
-      ]
+      ],
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true

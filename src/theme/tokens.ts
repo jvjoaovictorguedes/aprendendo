@@ -20,7 +20,10 @@ export const colors = {
   surface: '#FFFFFF',
   surfaceAlt: '#F6F7F8',
   surfaceSunken: '#EFF1F2',
+  surfaceDark: '#15181C',
   border: '#E6E8EA',
+
+  starGold: '#FFD166',
 
   overlay: 'rgba(10, 12, 14, 0.55)',
 } as const;
@@ -39,6 +42,7 @@ export const radius = {
   md: 12,
   lg: 16,
   xl: 24,
+  xxl: 28,
   pill: 999,
 } as const;
 

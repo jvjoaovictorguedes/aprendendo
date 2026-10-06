@@ -1,13 +1,14 @@
 import { useIsFocused, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 
-import { Button } from '../components/ui';
+import { Button, Icon } from '../components/ui';
 import { useBudget } from '../context/BudgetContext';
 import { useCart } from '../context/CartContext';
 import { useLists } from '../context/ListsContext';
+import { useNotifications } from '../context/NotificationsContext';
 import { usePromotions } from '../context/PromotionsContext';
 import { colors, radius, spacing, typography } from '../theme/tokens';
 import { computeCartTotals, formatBRL } from '../utils/pricing';
@@ -28,12 +29,40 @@ export default function ComprarScreen() {
   const { extraPercentOffFor } = usePromotions();
   const { markBoughtByBarcode, activeListId, lists } = useLists();
   const { limit } = useBudget();
+  const { notify } = useNotifications();
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const lockRef = useRef(false);
   const feedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasWarnedRef = useRef(false);
+  const hasExceededRef = useRef(false);
 
   const totals = computeCartTotals(items, extraPercentOffFor);
   const activeList = lists.find((list) => list.id === activeListId);
+
+  useEffect(() => {
+    hasWarnedRef.current = false;
+    hasExceededRef.current = false;
+  }, [limit]);
+
+  useEffect(() => {
+    if (limit == null) return;
+
+    if (totals.finalTotal > limit && !hasExceededRef.current) {
+      hasExceededRef.current = true;
+      notify({
+        title: 'Orçamento estourado',
+        body: `Sua compra já passou do limite de ${formatBRL(limit)}.`,
+        kind: 'budget',
+      });
+    } else if (totals.finalTotal / limit >= BUDGET_WARNING_THRESHOLD && !hasWarnedRef.current) {
+      hasWarnedRef.current = true;
+      notify({
+        title: 'Atenção ao orçamento',
+        body: `Você já usou ${Math.round((totals.finalTotal / limit) * 100)}% do seu limite de compra.`,
+        kind: 'budget',
+      });
+    }
+  }, [totals.finalTotal, limit, notify]);
 
   const clearFeedbackLater = useCallback(() => {
     if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
@@ -95,7 +124,7 @@ export default function ComprarScreen() {
   if (!permission.granted) {
     return (
       <View style={styles.center}>
-        <Text style={styles.permissionEmoji}>📷</Text>
+        <Icon name="camera" size={40} color={colors.brand} />
         <Text style={styles.permissionTitle}>Câmera necessária</Text>
         <Text style={styles.permissionText}>
           Para bipar os produtos, o ScanMercado precisa acessar a câmera do seu celular.
@@ -191,7 +220,7 @@ const styles = StyleSheet.create({
     height: 160,
     borderWidth: 3,
     borderColor: colors.brand,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     backgroundColor: 'transparent',
   },
   center: {
@@ -202,8 +231,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     gap: spacing.sm,
   },
-  permissionEmoji: { fontSize: 40, marginBottom: spacing.sm },
-  permissionTitle: { ...typography.h1, color: colors.text },
+  permissionTitle: { ...typography.h1, color: colors.text, marginTop: spacing.sm },
   permissionText: {
     ...typography.body,
     color: colors.textMuted,

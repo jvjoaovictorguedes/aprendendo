@@ -1,11 +1,14 @@
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
-import { Badge, Button, Card, Section } from '../components/ui';
+import { Badge, Button, Card, Icon, Section } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useHistory } from '../context/HistoryContext';
 import { useLists } from '../context/ListsContext';
+import { useNotifications } from '../context/NotificationsContext';
 import { usePromotions } from '../context/PromotionsContext';
 import { MEMBER_PROMOTIONS } from '../data/memberPromotions';
 import { MOCK_PRODUCTS } from '../data/products';
@@ -24,10 +27,12 @@ function getGreeting(): string {
 export default function HomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const { items } = useCart();
+  const { items, addByBarcode } = useCart();
   const { extraPercentOffFor } = usePromotions();
   const { lists } = useLists();
   const { purchases } = useHistory();
+  const { unreadCount } = useNotifications();
+  const [query, setQuery] = useState('');
 
   const totals = computeCartTotals(items, extraPercentOffFor);
   const hasActiveCart = items.length > 0;
@@ -35,13 +40,75 @@ export default function HomeScreen() {
   const recentPurchase = purchases[0];
   const availableMemberOffers = MEMBER_PROMOTIONS.length;
 
+  const searchMatches = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return [];
+    return MOCK_PRODUCTS.filter((product) => product.name.toLowerCase().includes(normalized)).slice(
+      0,
+      4,
+    );
+  }, [query]);
+
+  const handleQuickAdd = async (barcode: string) => {
+    await addByBarcode(barcode);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    setQuery('');
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
       <View style={styles.header}>
-        <Text style={styles.greeting}>
-          {getGreeting()}{user ? `, ${user.name.split(' ')[0]}` : ''}
-        </Text>
-        <Text style={styles.store}>📍 ScanMercado — Loja Centro</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.greeting}>
+            {getGreeting()}
+            {user ? `, ${user.name.split(' ')[0]}` : ''}
+          </Text>
+          <View style={styles.storeRow}>
+            <Icon name="map-pin" size={13} color={colors.textMuted} />
+            <Text style={styles.store}>Loja Centro</Text>
+          </View>
+        </View>
+        <TouchableOpacity
+          onPress={() => router.push('/notifications')}
+          accessibilityRole="button"
+          accessibilityLabel="Notificações"
+          style={styles.bellButton}
+        >
+          <Icon name="bell" size={19} color={colors.text} />
+          {unreadCount > 0 ? <View style={styles.bellBadge} /> : null}
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.sectionPadding}>
+        <View style={styles.searchBar}>
+          <Icon name="search" size={17} color={colors.textFaint} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Buscar produtos, ofertas…"
+            placeholderTextColor={colors.textFaint}
+            value={query}
+            onChangeText={setQuery}
+          />
+        </View>
+        {searchMatches.length > 0 ? (
+          <Card style={styles.searchResults}>
+            {searchMatches.map((product) => (
+              <View key={product.barcode} style={styles.searchRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.searchName}>{product.name}</Text>
+                  <Text style={styles.searchPrice}>{formatBRL(product.price)}</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.searchAddButton}
+                  onPress={() => handleQuickAdd(product.barcode)}
+                  accessibilityLabel={`Adicionar ${product.name} ao carrinho`}
+                >
+                  <Icon name="plus" size={16} color={colors.onBrand} />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </Card>
+        ) : null}
       </View>
 
       <View style={styles.ctaWrapper}>
@@ -51,14 +118,16 @@ export default function HomeScreen() {
           accessibilityRole="button"
           accessibilityLabel="Começar compra"
         >
-          <Text style={styles.ctaEmoji}>📷</Text>
+          <View style={styles.ctaIconWrap}>
+            <Icon name="camera" size={22} color={colors.onBrand} />
+          </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.ctaTitle}>
               {hasActiveCart ? 'Continuar comprando' : 'Começar compra'}
             </Text>
             <Text style={styles.ctaSubtitle}>Bipe os produtos e acompanhe o total</Text>
           </View>
-          <Text style={styles.ctaArrow}>›</Text>
+          <Icon name="chevron-right" size={20} color={colors.onBrand} />
         </TouchableOpacity>
       </View>
 
@@ -83,6 +152,27 @@ export default function HomeScreen() {
         </View>
       ) : null}
 
+      <View style={[styles.sectionPadding, styles.quickActions]}>
+        <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/promotions')}>
+          <View style={styles.quickActionIcon}>
+            <Icon name="tag" size={21} color={colors.brand} />
+          </View>
+          <Text style={styles.quickActionLabel}>Cupons</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/profile')}>
+          <View style={styles.quickActionIcon}>
+            <Icon name="heart" size={21} color={colors.textMuted} />
+          </View>
+          <Text style={styles.quickActionLabel}>Favoritos</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/lojas')}>
+          <View style={styles.quickActionIcon}>
+            <Icon name="map-pin" size={21} color={colors.textMuted} />
+          </View>
+          <Text style={styles.quickActionLabel}>Lojas</Text>
+        </TouchableOpacity>
+      </View>
+
       <Section title="Ofertas para você" actionLabel="Ver todas" onAction={() => router.push('/promotions')}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: spacing.md }}>
           {storeOffers.map((product) => (
@@ -98,11 +188,28 @@ export default function HomeScreen() {
             <Card style={[styles.offerCard, { backgroundColor: colors.brandSoft }]}>
               <Badge label="Exclusivo" variant="brand" />
               <Text style={styles.offerName}>{availableMemberOffers} ofertas de cliente disponíveis</Text>
-              <Text style={styles.offerLink}>Ativar na aba Promoções</Text>
+              <Text style={styles.offerLink}>Ativar na aba Ofertas</Text>
             </Card>
           ) : null}
         </ScrollView>
       </Section>
+
+      <View style={styles.sectionPadding}>
+        <TouchableOpacity style={styles.couponBanner} onPress={() => router.push(user ? '/promotions' : '/profile')}>
+          <View style={styles.couponIconWrap}>
+            <Icon name="tag" size={20} color={colors.brand} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.couponTitle}>
+              {user ? `Você tem ${availableMemberOffers} cupons disponíveis` : 'Faça login para ver cupons exclusivos'}
+            </Text>
+            <Text style={styles.couponSubtitle}>
+              {user ? 'Economize ativando antes de bipar' : 'Entre na aba Conta para desbloquear'}
+            </Text>
+          </View>
+          <Icon name="chevron-right" size={18} color={colors.textFaint} />
+        </TouchableOpacity>
+      </View>
 
       <Section title="Suas listas" actionLabel="Ver todas" onAction={() => router.push('/listas')}>
         <View style={styles.sectionPadding}>
@@ -165,24 +272,106 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surfaceAlt },
-  header: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    gap: spacing.sm,
+  },
   greeting: { ...typography.h1, color: colors.text },
-  store: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+  storeRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  store: { ...typography.caption, color: colors.textMuted },
+  bellButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bellBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 4,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: colors.danger,
+    borderWidth: 2,
+    borderColor: colors.surface,
+  },
+  sectionPadding: { paddingHorizontal: spacing.lg },
+  searchBar: {
+    marginTop: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.lg,
+  },
+  searchInput: { flex: 1, paddingVertical: spacing.md, ...typography.body, color: colors.text },
+  searchResults: { marginTop: spacing.sm, padding: spacing.sm },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+  },
+  searchName: { ...typography.bodyStrong, color: colors.text },
+  searchPrice: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+  searchAddButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   ctaWrapper: { paddingHorizontal: spacing.lg, marginTop: spacing.lg },
   ctaButton: {
     backgroundColor: colors.brand,
-    borderRadius: radius.lg,
+    borderRadius: radius.xxl,
     paddingVertical: spacing.lg,
     paddingHorizontal: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
   },
-  ctaEmoji: { fontSize: 32 },
+  ctaIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   ctaTitle: { ...typography.h2, color: colors.onBrand },
   ctaSubtitle: { ...typography.caption, color: colors.onBrand, opacity: 0.9, marginTop: 2 },
-  ctaArrow: { ...typography.display, color: colors.onBrand },
-  sectionPadding: { paddingHorizontal: spacing.lg },
+  quickActions: {
+    marginTop: spacing.lg,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  quickAction: { flex: 1, alignItems: 'center', gap: spacing.sm },
+  quickActionIcon: {
+    width: '100%',
+    height: 58,
+    borderRadius: 18,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickActionLabel: { ...typography.small, color: colors.textMuted, textAlign: 'center' },
   cartRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cartLabel: { ...typography.caption, color: colors.textMuted },
   cartItemCount: { ...typography.bodyStrong, color: colors.text, marginTop: 2 },
@@ -191,6 +380,26 @@ const styles = StyleSheet.create({
   offerName: { ...typography.bodyStrong, color: colors.text, marginTop: spacing.sm },
   offerPrice: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
   offerLink: { ...typography.small, color: colors.brandDark, marginTop: 2, fontWeight: '700' },
+  couponBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.xl,
+    padding: spacing.lg,
+  },
+  couponIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: colors.brandSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  couponTitle: { ...typography.bodyStrong, color: colors.text },
+  couponSubtitle: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
   listName: { ...typography.bodyStrong, color: colors.text },
   listProgress: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
   emptyHint: { ...typography.body, color: colors.textMuted },

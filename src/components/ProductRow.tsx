@@ -1,5 +1,6 @@
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { Icon } from './ui';
 import { colors, radius, spacing, typography } from '../theme/tokens';
 import { CartItem } from '../types';
 import { computeLineTotal, formatBRL } from '../utils/pricing';
@@ -35,7 +36,7 @@ export function ProductRow({
           </Text>
           {onToggleFavorite ? (
             <TouchableOpacity onPress={onToggleFavorite} hitSlop={8} accessibilityLabel="Favoritar produto">
-              <Text style={styles.favoriteIcon}>{isFavorite ? '♥' : '♡'}</Text>
+              <Icon name="heart" size={16} color={isFavorite ? colors.danger : colors.textFaint} />
             </TouchableOpacity>
           ) : null}
         </View>
@@ -43,10 +44,10 @@ export function ProductRow({
           {formatBRL(item.product.price)} / {item.product.unit}
         </Text>
         {item.product.promotion ? (
-          <Text style={styles.promoLabel}>🏷 {item.product.promotion.label}</Text>
+          <Text style={styles.promoLabel}>{item.product.promotion.label}</Text>
         ) : null}
         {extraPercentOff > 0 ? (
-          <Text style={styles.memberLabel}>⭐ Desconto de cliente ativo (-{extraPercentOff}%)</Text>
+          <Text style={styles.memberLabel}>Desconto de cliente ativo (-{extraPercentOff}%)</Text>
         ) : null}
       </View>
 
@@ -86,7 +87,6 @@ const styles = StyleSheet.create({
   info: { flex: 1.4 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   name: { ...typography.bodyStrong, color: colors.text, flexShrink: 1 },
-  favoriteIcon: { fontSize: 16, color: colors.danger },
   unitPrice: { ...typography.small, color: colors.textMuted, marginTop: 2 },
   promoLabel: { ...typography.small, color: colors.danger, marginTop: 4, fontWeight: '600' },
   memberLabel: { ...typography.small, color: colors.brand, marginTop: 2, fontWeight: '600' },
