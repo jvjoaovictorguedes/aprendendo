@@ -41,8 +41,10 @@ create table public.profiles (
   cpf         text unique,                               -- cliente final loga com CPF (ver nota de auth no README)
   points      integer not null default 0,
   created_at  timestamptz not null default now(),
-  constraint tenant_required_unless_platform_admin
-    check (role = 'platform_admin' or tenant_id is not null)
+  -- Só admin de franquia é obrigado a ter franquia (ver migração 003: a regra
+  -- antiga barrava a criação de qualquer conta sem franquia).
+  constraint tenant_admin_requires_tenant
+    check (role <> 'tenant_admin' or tenant_id is not null)
 );
 
 -- Cria o profile automaticamente quando alguém se cadastra via Supabase Auth.
