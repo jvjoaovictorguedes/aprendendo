@@ -144,11 +144,11 @@ src/
 A forma mais rápida de ver o app funcionando no seu celular é pelo **Expo Go**:
 
 ```bash
-npm install
-npx expo start
+npm ci
+npm run start:go -- --clear
 ```
 
-Abra o app **Expo Go** (Android/iOS) e escaneie o QR code que aparece no terminal. A leitura de código de barras funciona dentro do Expo Go normalmente.
+Atualize o **Expo Go** para uma versão compatível com o SDK 57 e escaneie o QR code que aparece no terminal. O comando acima força o destino Expo Go; `npm run start` pode selecionar development build porque o projeto inclui `expo-dev-client`. A leitura de código de barras funciona dentro do Expo Go normalmente.
 
 Como o catálogo é fictício, para testar a leitura de um código de barras real, gere uma imagem de código de barras com um dos números cadastrados em `src/data/products.ts` (ex.: `7891000200104`, que tem a promoção "Leve 3 Pague 2") em qualquer gerador online de EAN-13 e aponte a câmera para a tela/impressão.
 
