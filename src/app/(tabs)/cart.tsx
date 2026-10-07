@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Alert, FlatList, Platform, StyleSheet, Text, View } from 'react-native';
 
@@ -14,6 +14,8 @@ import { usePromotions } from '../../context/PromotionsContext';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { cartItemKey } from '../../types';
 import { computeCartTotals, computeCartLines, formatBRL } from '../../utils/pricing';
+import { useNotifications } from '../../context/NotificationsContext';
+import { isApiConfigured } from '../../services/api';
 
 export default function CartScreen() {
   const router = useRouter();
@@ -29,6 +31,9 @@ export default function CartScreen() {
   } = useCart();
   const { extraPercentOffFor, offers, isActivated, refresh, error: offerError } = usePromotions();
   const { user } = useAuth();
+  const { confirmPurchase } = useNotifications();
+  const [confirming, setConfirming] = useState(false);
+  const [confirmationError, setConfirmationError] = useState<string | null>(null);
   useFocusEffect(
     useCallback(() => {
       void refreshPrices();
@@ -92,18 +97,47 @@ export default function CartScreen() {
       return;
     }
     Alert.alert(
-      'Finalizar compra',
+      'Salvar prévia',
       'Isso arquiva a compra no seu histórico e esvazia o carrinho. O pagamento continua sendo feito no caixa — este é só o resumo do que você escaneou.',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
-          text: 'Finalizar',
+          text: 'Salvar prévia',
           onPress: () => {
             finish();
           },
         },
       ],
     );
+  };
+
+  const handleConfirmedPurchase = () => {
+    const submit = async () => {
+      setConfirming(true);
+      setConfirmationError(null);
+      try {
+        await confirmPurchase();
+        finish();
+      } catch (error) {
+        setConfirmationError(
+          error instanceof Error
+            ? error.message
+            : 'Não foi possível confirmar. Seu carrinho foi mantido.',
+        );
+      } finally {
+        setConfirming(false);
+      }
+    };
+    const message =
+      'Você já pagou estes itens no caixa? A confirmação registra seu histórico para recomendar ofertas. Ela não faz pagamento nem concede pontos.';
+    if (Platform.OS === 'web') {
+      if (globalThis.confirm(message)) void submit();
+      return;
+    }
+    Alert.alert('Confirmar compra no caixa', message, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Já paguei', onPress: () => void submit() },
+    ]);
   };
 
   if (items.length === 0) {
@@ -132,9 +166,15 @@ export default function CartScreen() {
             extraPercentOff={extraPercentOffFor(item.product.barcode)}
             isFavorite={isFavorite(item.product.barcode)}
             onToggleFavorite={() => toggleFavorite(item.product.barcode)}
-            onIncrement={() => incrementItem(cartItemKey(item))}
-            onDecrement={() => decrementItem(cartItemKey(item))}
-            onRemove={() => removeItem(cartItemKey(item))}
+            onIncrement={() => {
+              if (!confirming) incrementItem(cartItemKey(item));
+            }}
+            onDecrement={() => {
+              if (!confirming) decrementItem(cartItemKey(item));
+            }}
+            onRemove={() => {
+              if (!confirming) removeItem(cartItemKey(item));
+            }}
           />
         )}
         ListHeaderComponent={
@@ -193,7 +233,7 @@ export default function CartScreen() {
         </View>
 
         <View style={styles.actions}>
-          <Button label="Limpar" variant="danger" onPress={confirmClear} />
+          <Button label="Limpar" variant="danger" onPress={confirmClear} disabled={confirming} />
           <Button
             label="Continuar comprando"
             variant="secondary"
@@ -202,12 +242,26 @@ export default function CartScreen() {
           />
         </View>
         <Button
-          label="Finalizar compra"
+          label="Salvar prévia no histórico"
+          variant="secondary"
           onPress={handleCheckout}
-          disabled={!!priceError || refreshing || !!offerError}
+          disabled={confirming || !!priceError || refreshing || !!offerError}
           fullWidth
           style={{ marginTop: spacing.sm }}
         />
+        {isApiConfigured && user ? (
+          <Button
+            label="Já comprei no caixa"
+            onPress={handleConfirmedPurchase}
+            loading={confirming}
+            disabled={!!priceError || refreshing || !!offerError}
+            fullWidth
+            style={{ marginTop: spacing.sm }}
+          />
+        ) : null}
+        {confirmationError ? (
+          <Text style={{ color: colors.danger, marginTop: spacing.sm }}>{confirmationError}</Text>
+        ) : null}
         <Text style={styles.disclaimer}>
           Este app não substitui o caixa. Valores finais podem variar conforme validação no PDV.
         </Text>

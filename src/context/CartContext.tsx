@@ -32,6 +32,7 @@ type AddResult =
   | { status: 'not_found'; barcode: string; source: CatalogSource };
 
 type CartContextValue = {
+  isReady: boolean;
   items: CartItem[];
   addByBarcode: (code: string) => Promise<AddResult>;
   /** As três recebem cartItemKey(item). */
@@ -205,6 +206,7 @@ export function CartProvider({ children }: PropsWithChildren) {
 
   const value = useMemo<CartContextValue>(
     () => ({
+      isReady: isLoaded,
       items,
       addByBarcode,
       incrementItem,
@@ -216,6 +218,7 @@ export function CartProvider({ children }: PropsWithChildren) {
       refreshing,
     }),
     [
+      isLoaded,
       items,
       addByBarcode,
       incrementItem,

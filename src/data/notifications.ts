@@ -7,6 +7,8 @@ export type NotificationItem = {
   createdAt: string; // ISO
   read: boolean;
   kind: NotificationKind;
+  target?: 'cart' | 'promotions';
+  offerId?: string | null;
 };
 
 // Notificações de exemplo para o app piloto — em produção viriam do backend

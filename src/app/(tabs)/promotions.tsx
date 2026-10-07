@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -18,6 +18,8 @@ import { usePromotions } from '../../context/PromotionsContext';
 import { useCart } from '../../context/CartContext';
 import { colors, radius, spacing, typography } from '../../theme/tokens';
 export default function PromotionsScreen() {
+  const router = useRouter();
+  const { offerId } = useLocalSearchParams<{ offerId?: string }>();
   const { offers, loading, error, refresh } = usePromotions();
   const { refreshPrices } = useCart();
   const [category, setCategory] = useState('Todos'),
@@ -29,6 +31,7 @@ export default function PromotionsScreen() {
     }, [refresh, refreshPrices]),
   );
   const categories = ['Todos', ...new Set(offers.map((o) => o.product.category))];
+  const selectedOffer = offers.find((o) => o.id === offerId);
   const filtered = offers.filter(
     (o) =>
       (category === 'Todos' || o.product.category === category) &&
@@ -54,6 +57,23 @@ export default function PromotionsScreen() {
         escanear.
       </Text>
       <StoreSelector />
+      {offerId ? (
+        <View style={{ gap: spacing.sm }}>
+          <Text style={styles.caption}>Oferta do aviso</Text>
+          {selectedOffer ? (
+            <OfferCard offer={selectedOffer} />
+          ) : !loading && !error ? (
+            <Text style={styles.caption}>
+              Essa oferta não está mais disponível na loja selecionada.
+            </Text>
+          ) : null}
+          <Button
+            label="Ver todas as ofertas"
+            variant="secondary"
+            onPress={() => router.setParams({ offerId: '' })}
+          />
+        </View>
+      ) : null}
       <TextInput
         value={query}
         onChangeText={setQuery}
@@ -87,9 +107,11 @@ export default function PromotionsScreen() {
           Nenhuma oferta encontrada. Você pode trocar a loja ou limpar a busca.
         </Text>
       ) : null}
-      {filtered.map((o) => (
-        <OfferCard key={o.id} offer={o} />
-      ))}
+      {filtered
+        .filter((o) => o.id !== selectedOffer?.id)
+        .map((o) => (
+          <OfferCard key={o.id} offer={o} />
+        ))}
     </ScrollView>
   );
 }

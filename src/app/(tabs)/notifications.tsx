@@ -1,4 +1,6 @@
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useCallback } from 'react';
+import { useFocusEffect } from 'expo-router';
 
 import { EmptyState, Icon } from '../../components/ui';
 import { useNotifications } from '../../context/NotificationsContext';
@@ -23,12 +25,22 @@ function timeAgo(iso: string): string {
 }
 
 export default function NotificationsScreen() {
-  const { notifications, markAsRead, markAllAsRead, unreadCount } = useNotifications();
+  const { notifications, openNotification, markAllAsRead, unreadCount, refreshInbox } =
+    useNotifications();
+  useFocusEffect(
+    useCallback(() => {
+      void refreshInbox().catch(() => {});
+    }, [refreshInbox]),
+  );
 
   if (notifications.length === 0) {
     return (
       <View style={styles.container}>
-        <EmptyState title="Nenhuma notificação" subtitle="Avisos de cupons e orçamento aparecem aqui." emoji="🔔" />
+        <EmptyState
+          title="Nenhuma notificação"
+          subtitle="Avisos de cupons e orçamento aparecem aqui."
+          emoji="🔔"
+        />
       </View>
     );
   }
@@ -49,7 +61,7 @@ export default function NotificationsScreen() {
       renderItem={({ item }: { item: NotificationItem }) => (
         <TouchableOpacity
           style={[styles.card, !item.read && styles.cardUnread]}
-          onPress={() => markAsRead(item.id)}
+          onPress={() => openNotification(item)}
         >
           <View style={styles.iconWrap}>
             <Icon name={KIND_ICON[item.kind]} size={18} color={colors.brand} />

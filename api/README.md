@@ -51,6 +51,10 @@ npm test
 
 Sobem um PostgreSQL de verdade em memória (PGlite) — não precisa de banco instalado. Cobrem login, sessões, papéis, isolamento entre franquias, balança, produtos e usuários.
 
+Também cobrem retenção: preferências opt-in, carrinhos e compras declaradas idempotentes, ofertas por frequência, horário, limite diário, revogação, retry e recibos de push, usando um transporte falso.
+
+O envio remoto roda a cada minuto no serviço da API quando `PUSH_ENABLED=true`; começa desligado. Configure credenciais FCM/APNs no EAS e instale um build do aplicativo para validar no celular. A migração `004` roda no boot. Consulte [NOTIFICATIONS.md](../docs/NOTIFICATIONS.md) para variáveis, rotas e regras.
+
 ## Rotas
 
 | Rota | Quem | O quê |

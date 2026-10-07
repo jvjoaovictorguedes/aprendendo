@@ -5,6 +5,7 @@ import { bootstrap } from './bootstrap.js';
 import { loadConfig } from './config.js';
 import { migrate } from './db/migrate.js';
 import { createPool } from './db/pool.js';
+import { startEngagementWorker } from './engagement.js';
 
 async function main() {
   const config = loadConfig();
@@ -14,8 +15,14 @@ async function main() {
   await bootstrap(db, config);
 
   const app = await buildApp({ db, config }, { logger: true });
+  const stopWorker = config.PUSH_ENABLED
+    ? startEngagementWorker(db, config, (error) =>
+        app.log.error({ err: error }, 'Falha na rotina de notificações'),
+      )
+    : async () => {};
 
   const shutdown = async () => {
+    await stopWorker();
     await app.close();
     await db.end();
     process.exit(0);
