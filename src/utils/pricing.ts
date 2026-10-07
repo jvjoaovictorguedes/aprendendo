@@ -7,51 +7,56 @@ export type LineTotal = {
 };
 
 export function roundCents(value: number): number {
-  return Math.round(value * 100) / 100;
+  const cents = value * 100;
+  // Correct binary floating-point drift at a half-cent (24.90 × 0.75 = 18.675).
+  return Math.round(cents + Number.EPSILON * Math.max(1, Math.abs(cents))) / 100;
 }
 
 export function computeLineTotal(item: CartItem, extraPercentOff = 0): LineTotal {
   const { product, quantity, weighed } = item;
   const originalTotal = weighed ? weighed.labelTotal * quantity : product.price * quantity;
-  const promotion = product.promotion;
-
+  const candidate = product.promotion;
+  const now = Date.now();
+  const promotion =
+    candidate &&
+    (!candidate.startsAt || Date.parse(candidate.startsAt) <= now) &&
+    (!candidate.endsAt || Date.parse(candidate.endsAt) > now)
+      ? candidate
+      : undefined;
   let finalTotal = originalTotal;
-
-  if (weighed) {
-    // Etiqueta de balança: o preço/kg da promoção vale sobre o peso;
-    // "leve X pague Y" não se aplica a produto pesado.
-    if (promotion?.kind === 'percentOff') {
-      finalTotal = originalTotal * (1 - promotion.percent / 100);
-    } else if (promotion?.kind === 'fixedPrice') {
-      finalTotal = Math.min(originalTotal, promotion.price * weighed.weightKg * quantity);
-    }
-  } else if (promotion) {
+  const measuredQuantity = weighed ? weighed.weightKg * quantity : quantity;
+  const eligible = Math.min(measuredQuantity, promotion?.maxQuantity ?? measuredQuantity);
+  const normalEligible = weighed
+    ? originalTotal * (eligible / measuredQuantity)
+    : product.price * eligible;
+  if (promotion) {
     switch (promotion.kind) {
       case 'percentOff':
-        finalTotal = originalTotal * (1 - promotion.percent / 100);
+        finalTotal = originalTotal - (normalEligible * promotion.percent) / 100;
         break;
       case 'fixedPrice':
-        finalTotal = promotion.price * quantity;
+        finalTotal =
+          originalTotal - normalEligible + Math.min(normalEligible, promotion.price * eligible);
         break;
-      case 'buyXPayY': {
-        const fullGroups = Math.floor(quantity / promotion.buy);
-        const remainder = quantity % promotion.buy;
-        const payableUnits = fullGroups * promotion.pay + remainder;
-        finalTotal = product.price * payableUnits;
+      case 'buyXPayY':
+        if (!weighed && product.unit === 'un') {
+          finalTotal =
+            originalTotal -
+            Math.floor(eligible / promotion.buy) * (promotion.buy - promotion.pay) * product.price;
+        }
         break;
-      }
     }
   }
 
   // Desconto exclusivo de cliente logado, ativado na aba Promoções,
   // aplicado por cima do preço já promocional (se houver).
   if (extraPercentOff > 0) {
-    finalTotal = finalTotal * (1 - extraPercentOff / 100);
+    finalTotal = finalTotal * (1 - Math.min(100, extraPercentOff) / 100);
   }
 
   // Arredonda por linha, como o PDV faz — evita diferença de centavos no total.
   const roundedOriginal = roundCents(originalTotal);
-  const roundedFinal = roundCents(finalTotal);
+  const roundedFinal = roundCents(Math.max(0, Math.min(originalTotal, finalTotal)));
 
   return {
     originalTotal: roundedOriginal,
@@ -67,19 +72,50 @@ export type CartTotals = {
   savings: number;
 };
 
+/** A limit applies to the entire purchase, including separate scale labels. */
+export function computeCartLines(
+  items: CartItem[],
+  getExtraPercentOff?: (barcode: string) => number,
+): LineTotal[] {
+  const quantities = new Map<string, number>();
+  for (const item of items) {
+    const quantity = item.quantity * (item.weighed?.weightKg ?? 1);
+    quantities.set(item.product.barcode, (quantities.get(item.product.barcode) ?? 0) + quantity);
+  }
+  return items.map((item) => {
+    const promotion = item.product.promotion;
+    const quantity = item.quantity * (item.weighed?.weightKg ?? 1);
+    const total = quantities.get(item.product.barcode) ?? quantity;
+    const adjusted =
+      promotion?.maxQuantity && total > promotion.maxQuantity
+        ? {
+            ...item,
+            product: {
+              ...item.product,
+              promotion: {
+                ...promotion,
+                maxQuantity: (promotion.maxQuantity * quantity) / total,
+              },
+            },
+          }
+        : item;
+    return computeLineTotal(adjusted, getExtraPercentOff?.(item.product.barcode) ?? 0);
+  });
+}
+
 export function computeCartTotals(
   items: CartItem[],
   getExtraPercentOff?: (barcode: string) => number,
 ): CartTotals {
+  const lines = computeCartLines(items, getExtraPercentOff);
   return items.reduce<CartTotals>(
-    (acc, item) => {
-      const extraPercentOff = getExtraPercentOff?.(item.product.barcode) ?? 0;
-      const line = computeLineTotal(item, extraPercentOff);
+    (acc, item, index) => {
+      const line = lines[index];
       return {
         itemCount: acc.itemCount + item.quantity,
-        originalTotal: acc.originalTotal + line.originalTotal,
-        finalTotal: acc.finalTotal + line.finalTotal,
-        savings: acc.savings + line.savings,
+        originalTotal: roundCents(acc.originalTotal + line.originalTotal),
+        finalTotal: roundCents(acc.finalTotal + line.finalTotal),
+        savings: roundCents(acc.savings + line.savings),
       };
     },
     { itemCount: 0, originalTotal: 0, finalTotal: 0, savings: 0 },

@@ -1,6 +1,10 @@
-import { useRouter } from 'expo-router';
-import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
+import { useCallback } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { Alert, FlatList, Platform, StyleSheet, Text, View } from 'react-native';
 
+import { StoreSelector } from '../../components/StoreSelector';
+import { OfferCard } from '../../components/OfferCard';
+import { useAuth } from '../../context/AuthContext';
 import { ProductRow } from '../../components/ProductRow';
 import { Button, EmptyState } from '../../components/ui';
 import { useCart } from '../../context/CartContext';
@@ -9,24 +13,84 @@ import { useHistory } from '../../context/HistoryContext';
 import { usePromotions } from '../../context/PromotionsContext';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { cartItemKey } from '../../types';
-import { computeCartTotals, formatBRL } from '../../utils/pricing';
+import { computeCartTotals, computeCartLines, formatBRL } from '../../utils/pricing';
 
 export default function CartScreen() {
   const router = useRouter();
-  const { items, incrementItem, decrementItem, removeItem, clearCart } = useCart();
-  const { extraPercentOffFor } = usePromotions();
+  const {
+    items,
+    incrementItem,
+    decrementItem,
+    removeItem,
+    clearCart,
+    refreshPrices,
+    priceError,
+    refreshing,
+  } = useCart();
+  const { extraPercentOffFor, offers, isActivated, refresh, error: offerError } = usePromotions();
+  const { user } = useAuth();
+  useFocusEffect(
+    useCallback(() => {
+      void refreshPrices();
+      void refresh();
+    }, [refreshPrices, refresh]),
+  );
+  const pendingOffers = offers.filter(
+    (o) =>
+      o.audience === 'club' &&
+      !isActivated(o.id) &&
+      items.some((i) => i.product.barcode === o.product.barcode),
+  );
+  const potential = computeCartTotals(items, (barcode) => {
+    const quantity = items
+      .filter((i) => i.product.barcode === barcode)
+      .reduce((sum, i) => sum + i.quantity * (i.weighed?.weightKg ?? 1), 0);
+    return offers
+      .filter((o) => o.audience === 'club' && o.product.barcode === barcode)
+      .reduce(
+        (max, o) =>
+          Math.max(
+            max,
+            (o.percent ?? 0) *
+              (o.maxQuantity && quantity ? Math.min(1, o.maxQuantity / quantity) : 1),
+          ),
+        0,
+      );
+  });
   const { isFavorite, toggleFavorite } = useFavorites();
   const { addPurchase } = useHistory();
+  const lines = computeCartLines(items, extraPercentOffFor);
   const totals = computeCartTotals(items, extraPercentOffFor);
 
   const confirmClear = () => {
+    if (Platform.OS === 'web') {
+      if (globalThis.confirm('Remover todos os itens escaneados?')) clearCart();
+      return;
+    }
     Alert.alert('Limpar carrinho', 'Remover todos os itens escaneados?', [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Limpar', style: 'destructive', onPress: clearCart },
     ]);
   };
 
+  const finish = () => {
+    addPurchase(items, {
+      originalTotal: totals.originalTotal,
+      finalTotal: totals.finalTotal,
+      savings: totals.savings,
+    });
+    clearCart();
+    router.push('/historico');
+  };
   const handleCheckout = () => {
+    if (priceError || refreshing) return;
+    if (Platform.OS === 'web') {
+      if (
+        globalThis.confirm('Arquivar a prévia e limpar o carrinho? O pagamento continua no caixa.')
+      )
+        finish();
+      return;
+    }
     Alert.alert(
       'Finalizar compra',
       'Isso arquiva a compra no seu histórico e esvazia o carrinho. O pagamento continua sendo feito no caixa — este é só o resumo do que você escaneou.',
@@ -35,13 +99,7 @@ export default function CartScreen() {
         {
           text: 'Finalizar',
           onPress: () => {
-            addPurchase(items, {
-              originalTotal: totals.originalTotal,
-              finalTotal: totals.finalTotal,
-              savings: totals.savings,
-            });
-            clearCart();
-            router.push('/historico');
+            finish();
           },
         },
       ],
@@ -67,9 +125,10 @@ export default function CartScreen() {
       <FlatList
         data={items}
         keyExtractor={cartItemKey}
-        renderItem={({ item }) => (
+        renderItem={({ item, index }) => (
           <ProductRow
             item={item}
+            lineTotal={lines[index]}
             extraPercentOff={extraPercentOffFor(item.product.barcode)}
             isFavorite={isFavorite(item.product.barcode)}
             onToggleFavorite={() => toggleFavorite(item.product.barcode)}
@@ -78,6 +137,35 @@ export default function CartScreen() {
             onRemove={() => removeItem(cartItemKey(item))}
           />
         )}
+        ListHeaderComponent={
+          <View>
+            <StoreSelector />
+            {priceError ? (
+              <Text style={{ color: colors.danger, padding: spacing.md }}>
+                Preços pendentes de atualização: {priceError}
+              </Text>
+            ) : null}
+            {offerError ? (
+              <Text style={{ color: colors.danger, padding: spacing.md }}>
+                Não foi possível confirmar os cupons: {offerError}
+              </Text>
+            ) : null}
+            <Button
+              label={refreshing ? 'Atualizando preços…' : 'Atualizar preços e ofertas'}
+              variant="ghost"
+              disabled={refreshing}
+              onPress={() => {
+                void refreshPrices();
+                void refresh();
+              }}
+            />
+            {pendingOffers.map((o) => (
+              <View key={o.id} style={{ paddingHorizontal: spacing.md }}>
+                <OfferCard offer={o} />
+              </View>
+            ))}
+          </View>
+        }
         contentContainerStyle={{ paddingBottom: spacing.md }}
       />
 
@@ -91,6 +179,13 @@ export default function CartScreen() {
             <Text style={[styles.summaryLabel, styles.savingsLabel]}>Descontos</Text>
             <Text style={styles.savingsLabel}>- {formatBRL(totals.savings)}</Text>
           </View>
+        ) : null}
+        {pendingOffers.length && totals.finalTotal > potential.finalTotal ? (
+          <Text style={styles.savingsLabel}>
+            {user ? 'Ative os cupons acima' : 'Entre na conta e ative os cupons'} para economizar
+            até mais {formatBRL(totals.finalTotal - potential.finalTotal)}. Este valor ainda não foi
+            descontado.
+          </Text>
         ) : null}
         <View style={[styles.summaryRow, styles.totalRow]}>
           <Text style={styles.totalLabel}>Total estimado</Text>
@@ -109,6 +204,7 @@ export default function CartScreen() {
         <Button
           label="Finalizar compra"
           onPress={handleCheckout}
+          disabled={!!priceError || refreshing || !!offerError}
           fullWidth
           style={{ marginTop: spacing.sm }}
         />
@@ -133,7 +229,11 @@ const styles = StyleSheet.create({
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between' },
   summaryLabel: { ...typography.body, color: colors.textMuted },
   summaryValue: { ...typography.body, color: colors.textMuted },
-  savingsLabel: { ...typography.caption, color: colors.brand, fontWeight: '600' },
+  savingsLabel: {
+    ...typography.caption,
+    color: colors.brand,
+    fontWeight: '600',
+  },
   totalRow: {
     marginTop: spacing.xs,
     paddingTop: spacing.sm,

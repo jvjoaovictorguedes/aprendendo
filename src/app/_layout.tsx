@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { StoreProvider } from '../context/StoreContext';
 import { AuthProvider } from '../context/AuthContext';
 import { BudgetProvider } from '../context/BudgetContext';
 import { CartProvider } from '../context/CartContext';
@@ -18,28 +19,30 @@ export default function Layout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <TenantSettingsProvider>
-          <AuthProvider>
-            <CartProvider>
-              <PromotionsProvider>
-                <ListsProvider>
-                  <HistoryProvider>
-                    <BudgetProvider>
-                      <FavoritesProvider>
-                        <NotificationsProvider>
-                          <StatusBar style="light" />
-                          <Stack screenOptions={{ headerShown: false }}>
-                            <Stack.Screen name="(tabs)" />
-                            {/* Painel do lojista / plataforma — mobile e web */}
-                            <Stack.Screen name="admin" />
-                          </Stack>
-                        </NotificationsProvider>
-                      </FavoritesProvider>
-                    </BudgetProvider>
-                  </HistoryProvider>
-                </ListsProvider>
-              </PromotionsProvider>
-            </CartProvider>
-          </AuthProvider>
+          <StoreProvider>
+            <AuthProvider>
+              <CartProvider>
+                <PromotionsProvider>
+                  <ListsProvider>
+                    <HistoryProvider>
+                      <BudgetProvider>
+                        <FavoritesProvider>
+                          <NotificationsProvider>
+                            <StatusBar style="light" />
+                            <Stack screenOptions={{ headerShown: false }}>
+                              <Stack.Screen name="(tabs)" />
+                              {/* Painel do lojista / plataforma — mobile e web */}
+                              <Stack.Screen name="admin" />
+                            </Stack>
+                          </NotificationsProvider>
+                        </FavoritesProvider>
+                      </BudgetProvider>
+                    </HistoryProvider>
+                  </ListsProvider>
+                </PromotionsProvider>
+              </CartProvider>
+            </AuthProvider>
+          </StoreProvider>
         </TenantSettingsProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

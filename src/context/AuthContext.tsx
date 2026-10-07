@@ -10,10 +10,10 @@ import {
 } from 'react';
 
 import { findUserByCpf, User } from '../data/users';
-import { ApiError, apiRequest, isApiConfigured } from '../services/api';
+import { ApiError, apiRequest, appTenantId, isApiConfigured } from '../services/api';
 
-const STORAGE_KEY = 'scanmercado:auth:v1';
-const TOKEN_KEY = 'scanmercado:customer-token:v1';
+const STORAGE_KEY = `scanmercado:auth:${appTenantId ?? 'demo'}:v2`;
+const TOKEN_KEY = `scanmercado:customer-token:${appTenantId ?? 'demo'}:v2`;
 
 type PublicUser = Omit<User, 'password'>;
 type LoginResult = { status: 'ok' } | { status: 'invalid_credentials'; message?: string };
@@ -21,16 +21,29 @@ type LoginResult = { status: 'ok' } | { status: 'invalid_credentials'; message?:
 type AuthContextValue = {
   user: PublicUser | null;
   isReady: boolean;
+  token: string | null;
+  refreshUser: () => Promise<void>;
   login: (cpf: string, password: string) => Promise<LoginResult>;
+  register: (name: string, cpf: string, password: string) => Promise<LoginResult>;
   logout: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-type ApiCustomer = { id: string; name: string; cpf: string | null; points: number };
+type ApiCustomer = {
+  id: string;
+  name: string;
+  cpf: string | null;
+  points: number;
+};
 
 function fromApi(customer: ApiCustomer): PublicUser {
-  return { id: customer.id, name: customer.name, cpf: customer.cpf ?? '', points: customer.points };
+  return {
+    id: customer.id,
+    name: customer.name,
+    cpf: customer.cpf ?? '',
+    points: customer.points,
+  };
 }
 
 function toPublicUser(user: User): PublicUser {
@@ -83,11 +96,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     if (isApiConfigured) {
       try {
-        const result = await apiRequest<{ token: string; user: ApiCustomer }>('/auth/customer/login', {
-          method: 'POST',
-          tenant: true,
-          body: { cpf: cleanCpf, password },
-        });
+        const result = await apiRequest<{ token: string; user: ApiCustomer }>(
+          '/auth/customer/login',
+          {
+            method: 'POST',
+            tenant: true,
+            body: { cpf: cleanCpf, password },
+          },
+        );
         const publicUser = fromApi(result.user);
         setUser(publicUser);
         setToken(result.token);
@@ -97,7 +113,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
         ]);
         return { status: 'ok' };
       } catch (err) {
-        return { status: 'invalid_credentials', message: err instanceof Error ? err.message : undefined };
+        return {
+          status: 'invalid_credentials',
+          message: err instanceof Error ? err.message : undefined,
+        };
       }
     }
 
@@ -111,6 +130,42 @@ export function AuthProvider({ children }: PropsWithChildren) {
     return { status: 'ok' };
   }, []);
 
+  const register = useCallback(
+    async (name: string, cpf: string, password: string): Promise<LoginResult> => {
+      try {
+        const result = await apiRequest<{ token: string; user: ApiCustomer }>(
+          '/auth/customer/register',
+          {
+            method: 'POST',
+            tenant: true,
+            body: { name, cpf: cpf.replace(/\D/g, ''), password },
+          },
+        );
+        const publicUser = fromApi(result.user);
+        setUser(publicUser);
+        setToken(result.token);
+        await AsyncStorage.multiSet([
+          [STORAGE_KEY, JSON.stringify(publicUser)],
+          [TOKEN_KEY, result.token],
+        ]);
+        return { status: 'ok' };
+      } catch (e) {
+        return {
+          status: 'invalid_credentials',
+          message: e instanceof Error ? e.message : 'Não foi possível cadastrar.',
+        };
+      }
+    },
+    [],
+  );
+
+  const refreshUser = useCallback(async () => {
+    if (!isApiConfigured || !token) return;
+    const me = fromApi(await apiRequest<ApiCustomer>('/auth/me', { auth: token }));
+    setUser(me);
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(me));
+  }, [token]);
+
   const logout = useCallback(() => {
     if (isApiConfigured && token) {
       apiRequest('/auth/logout', { method: 'POST', auth: token }).catch(() => {});
@@ -121,8 +176,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, [token]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, isReady, login, logout }),
-    [user, isReady, login, logout],
+    () => ({ user, isReady, token, refreshUser, login, register, logout }),
+    [user, isReady, token, refreshUser, login, register, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

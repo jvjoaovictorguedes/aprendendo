@@ -38,6 +38,28 @@ export const DEFAULT_SCALE_CONFIG: ScaleLabelConfig = {
   validateCheckDigit: true,
 };
 
+/** 20 | 00100 | 01960 | 3: PLU 100, total R$ 19,60. */
+export const PRICE_20_SCALE_CONFIG: ScaleLabelConfig = {
+  enabled: true,
+  prefix: '20',
+  pluLength: 5,
+  valueType: 'price',
+  valueLength: 5,
+  valueDecimals: 2,
+  validateCheckDigit: true,
+};
+
+/** 2 | XXXXX | ZZZZZZ | C: seis dígitos de peso em gramas. */
+export const WEIGHT_2_SCALE_CONFIG: ScaleLabelConfig = {
+  enabled: true,
+  prefix: '2',
+  pluLength: 5,
+  valueType: 'weight',
+  valueLength: 6,
+  valueDecimals: 3,
+  validateCheckDigit: true,
+};
+
 export type ScaleLabel = {
   code: string;
   plu: string;
@@ -53,7 +75,8 @@ export function validateScaleConfig(config: ScaleLabelConfig): string | null {
   if (!/^[0-9]{1,2}$/.test(config.prefix)) return 'O prefixo deve ter 1 ou 2 dígitos.';
   if (config.pluLength < 1 || config.pluLength > 6) return 'O PLU deve ter de 1 a 6 dígitos.';
   if (config.valueLength < 4 || config.valueLength > 6) return 'O valor deve ter de 4 a 6 dígitos.';
-  if (config.valueDecimals < 0 || config.valueDecimals > 3) return 'As casas decimais devem ser de 0 a 3.';
+  if (config.valueDecimals < 0 || config.valueDecimals > 3)
+    return 'As casas decimais devem ser de 0 a 3.';
   if (config.prefix.length + config.pluLength + config.valueLength > EAN13_BODY_LENGTH) {
     return 'Prefixo + PLU + valor passam de 12 dígitos — não cabem num EAN-13.';
   }
@@ -97,14 +120,34 @@ export function parseScaleLabel(code: string, config: ScaleLabelConfig): ScaleLa
   return { code, plu, valueType: config.valueType, value };
 }
 
+/** Etiquetas reconhecidas pelo prefixo não podem cair na busca de produto comum. */
+export function readScannerLabel(code: string, config: ScaleLabelConfig): ScaleLabel | null {
+  if (!config.enabled || !/^[0-9]{13}$/.test(code) || !code.startsWith(config.prefix)) {
+    return null;
+  }
+  const label = parseScaleLabel(code, config);
+  if (!label || label.value <= 0) {
+    throw new Error('Etiqueta de balança inválida. Confira o código e a configuração da balança.');
+  }
+  return label;
+}
+
 /** Monta uma etiqueta de exemplo — usado no simulador do admin. */
-export function buildScaleLabel(plu: string, value: number, config: ScaleLabelConfig): string | null {
+export function buildScaleLabel(
+  plu: string,
+  value: number,
+  config: ScaleLabelConfig,
+): string | null {
   if (validateScaleConfig(config)) return null;
   const pluDigits = normalizePlu(plu).padStart(config.pluLength, '0');
-  const valueDigits = String(Math.round(value * 10 ** config.valueDecimals)).padStart(config.valueLength, '0');
+  const valueDigits = String(Math.round(value * 10 ** config.valueDecimals)).padStart(
+    config.valueLength,
+    '0',
+  );
   if (pluDigits.length > config.pluLength || valueDigits.length > config.valueLength) return null;
 
-  const fillerLength = EAN13_BODY_LENGTH - config.prefix.length - config.pluLength - config.valueLength;
+  const fillerLength =
+    EAN13_BODY_LENGTH - config.prefix.length - config.pluLength - config.valueLength;
   const body = config.prefix + pluDigits + '0'.repeat(fillerLength) + valueDigits;
   return body + ean13CheckDigit(body);
 }

@@ -66,4 +66,26 @@ Sobem um PostgreSQL de verdade em memória (PGlite) — não precisa de banco in
 
 ## Nova migração
 
-Crie `migrations/003_alguma_coisa.sql` (o número define a ordem). Ela roda sozinha no próximo deploy, numa transação — se falhar, nada é aplicado e o deploy não sobe.
+Crie `migrations/004_alguma_coisa.sql` (o número define a ordem). Ela roda sozinha no próximo deploy, numa transação — se falhar, nada é aplicado e o deploy não sobe.
+
+## Promoções, lojas e fidelidade
+
+A migração `003_offers_and_loyalty.sql` unifica as ofertas do clube em `promotions` e preserva as ativações existentes. Ela é aplicada automaticamente no próximo boot da API. As tabelas antigas permanecem para preservar os dados; a aplicação usa `promotion_activations` daqui em diante.
+
+| Rota | Acesso | Comportamento |
+|---|---|---|
+| `GET /public/offers?storeId=...` | `x-tenant-id` | Ofertas válidas da rede e da loja selecionada; uma oferta geral efetiva por produto |
+| `GET /public/stores`, `GET /public/loyalty` | `x-tenant-id` | Lojas ativas e regras concretas do programa |
+| `POST /auth/customer/register` | `x-tenant-id` | Nome, CPF validado e senha; cria somente cliente |
+| `/admin/tenants/:id/offers` | Plataforma ou lojista da própria franquia | GET/POST; PUT `/:offerId` para editar; DELETE `/:offerId` para pausar |
+| `/admin/tenants/:id/stores` | Admin da franquia | GET/POST; PUT `/:storeId` |
+| `/admin/tenants/:id/loyalty` | Admin da franquia | GET/PUT do programa |
+| `POST /admin/tenants/:id/loyalty/credits` | Admin da franquia | CPF, comprovante único e total confirmado; credita pontos em transação |
+| `/customer/activations` | Cliente autenticado | GET; PUT/DELETE `/:id` para ativar/desativar cupom |
+| `/customer/rewards` | Cliente autenticado | GET; POST com `requestKey` para trocar pontos de forma idempotente |
+| `GET /admin/tenants/:id/rewards` | Admin da franquia | Benefícios emitidos, cliente e estado da entrega |
+| `POST /admin/tenants/:id/rewards/:rewardId/redeem` | Admin da franquia | Confirma entrega uma única vez |
+
+Créditos exigem confirmação manual do pagamento pelo lojista. Não há conexão automática com PDV ou emissão de nota fiscal. O identificador do comprovante deve incluir loja/data/número para ser único na rede. Os pontos são inteiros, arredondados para baixo na conversão por real.
+
+Limites de oferta são por compra, em unidades ou kg. Condições textuais são exibidas ao cliente; regras adicionais escritas no texto não se tornam validações automáticas. O scanner e o carrinho são estimativas, sem pagamento ou aplicação direta de desconto no caixa.

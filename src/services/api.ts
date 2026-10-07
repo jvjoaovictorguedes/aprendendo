@@ -62,17 +62,28 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     .join('&');
 
   let response: Response;
+  let text: string;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
   try {
     response = await fetch(`${apiUrl}${path}${params ? `?${params}` : ''}`, {
+      signal: controller.signal,
       method: options.method ?? 'GET',
       headers,
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
     });
+    text = await response.text();
   } catch {
-    throw new ApiError(0, 'Sem conexão com o servidor. Confira a internet e tente de novo.');
+    throw new ApiError(
+      0,
+      controller.signal.aborted
+        ? 'O servidor demorou a responder. Tente novamente.'
+        : 'Sem conexão com o servidor. Confira a internet e tente de novo.',
+    );
+  } finally {
+    clearTimeout(timeout);
   }
 
-  const text = await response.text();
   let data: { error?: string } | null = null;
   try {
     data = text ? JSON.parse(text) : null;

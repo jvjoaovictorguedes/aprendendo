@@ -19,8 +19,12 @@ import { useBudget } from '../../context/BudgetContext';
 import { useFavorites } from '../../context/FavoritesContext';
 import { useHistory } from '../../context/HistoryContext';
 import { useNotifications } from '../../context/NotificationsContext';
+import { isApiConfigured } from '../../services/api';
+import { useCart } from '../../context/CartContext';
+import { usePromotions } from '../../context/PromotionsContext';
 import { findProductByBarcode } from '../../data/products';
 import { brand, colors, radius, spacing, typography } from '../../theme/tokens';
+import { LoyaltyCard } from '../../components/LoyaltyCard';
 import { getTierProgress } from '../../utils/loyalty';
 import { formatBRL } from '../../utils/pricing';
 
@@ -91,10 +95,15 @@ function MenuRow({
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user, login, logout } = useAuth();
+  const { user, login, register, logout } = useAuth();
   const { favoriteBarcodes, toggleFavorite } = useFavorites();
   const { purchases } = useHistory();
   const { pushEnabled, setPushEnabled } = useNotifications();
+  const { items } = useCart();
+  const { offers } = usePromotions();
+  const [registering, setRegistering] = useState(false),
+    [name, setName] = useState(''),
+    [loginError, setLoginError] = useState<string | null>(null);
   const [cpf, setCpf] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -102,7 +111,12 @@ export default function ProfileScreen() {
   if (user) {
     const tierProgress = getTierProgress(user.points);
     const favoriteProducts = favoriteBarcodes
-      .map((barcode) => findProductByBarcode(barcode))
+      .map((barcode) =>
+        isApiConfigured
+          ? (items.find((i) => i.product.barcode === barcode)?.product ??
+            offers.find((o) => o.product.barcode === barcode)?.product)
+          : findProductByBarcode(barcode),
+      )
       .filter((product): product is NonNullable<typeof product> => Boolean(product));
     const recentPurchases = purchases.slice(0, 2);
 
@@ -117,7 +131,13 @@ export default function ProfileScreen() {
     };
 
     return (
-      <ScrollView style={styles.container} contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl }}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{
+          padding: spacing.lg,
+          paddingBottom: spacing.xxl,
+        }}
+      >
         <View style={styles.loggedHeader}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{user.name.charAt(0)}</Text>
@@ -145,6 +165,7 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        <LoyaltyCard />
         <Card style={{ marginTop: spacing.lg }}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Favoritos</Text>
@@ -218,7 +239,10 @@ export default function ProfileScreen() {
             icon="help-circle"
             label="Ajuda e suporte"
             onPress={() =>
-              Alert.alert('Ajuda e suporte', 'Fale com a gente pelo e-mail contato@scanmercado.com.br')
+              Alert.alert(
+                'Ajuda e suporte',
+                'Fale com a gente pelo e-mail contato@scanmercado.com.br',
+              )
             }
           />
         </Card>
@@ -236,11 +260,12 @@ export default function ProfileScreen() {
       return;
     }
     setIsSubmitting(true);
-    const result = await login(cpf, password);
+    setLoginError(null);
+    const result = registering ? await register(name, cpf, password) : await login(cpf, password);
     setIsSubmitting(false);
 
     if (result.status === 'invalid_credentials') {
-      Alert.alert('Não foi possível entrar', result.message ?? 'CPF ou senha incorretos.');
+      setLoginError(result.message ?? 'CPF ou senha incorretos.');
     }
   };
 
@@ -249,12 +274,35 @@ export default function ProfileScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView contentContainerStyle={{ padding: spacing.xl, flexGrow: 1, justifyContent: 'center' }}>
-        <Text style={styles.title}>Entrar</Text>
+      <ScrollView
+        contentContainerStyle={{
+          padding: spacing.xl,
+          flexGrow: 1,
+          justifyContent: 'center',
+        }}
+      >
+        <Text style={styles.title}>{registering ? 'Criar conta do clube' : 'Entrar'}</Text>
         <Text style={styles.subtitle}>
-          Faça login para acumular pontos e ativar ofertas exclusivas.
+          Faça login para consultar seus pontos e ativar ofertas exclusivas.
         </Text>
 
+        {loginError ? (
+          <Text style={{ color: colors.danger }} accessibilityLiveRegion="polite">
+            {loginError}
+          </Text>
+        ) : null}
+        {registering ? (
+          <>
+            <Text style={styles.label}>Nome</Text>
+            <TextInput
+              style={styles.input}
+              value={name}
+              onChangeText={setName}
+              placeholder="Seu nome"
+              accessibilityLabel="Nome"
+            />
+          </>
+        ) : null}
         <Text style={styles.label}>CPF</Text>
         <TextInput
           style={styles.input}
@@ -277,14 +325,32 @@ export default function ProfileScreen() {
         />
 
         <Button
-          label={isSubmitting ? 'Entrando...' : 'Entrar'}
+          label={isSubmitting ? 'Aguarde…' : registering ? 'Criar conta' : 'Entrar'}
           onPress={handleLogin}
           loading={isSubmitting}
           fullWidth
           style={{ marginTop: spacing.xl }}
         />
 
-        <Text style={styles.demoHint}>Login de teste: CPF 12345678900, senha 123456</Text>
+        {isApiConfigured ? (
+          <Button
+            label={registering ? 'Já tenho conta' : 'Criar conta do clube'}
+            variant="ghost"
+            onPress={() => {
+              setRegistering(!registering);
+              setLoginError(null);
+            }}
+            disabled={isSubmitting}
+          />
+        ) : (
+          <Text style={styles.demoHint}>Demonstração: CPF 12345678900, senha 123456</Text>
+        )}
+        {registering ? (
+          <Text style={styles.demoHint}>
+            Use uma senha com pelo menos 8 caracteres. Seus dados identificam sua conta e os
+            benefícios desta rede.
+          </Text>
+        ) : null}
 
         <BudgetSection />
 
@@ -302,8 +368,19 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surfaceAlt },
   title: { ...typography.h1, color: colors.text },
-  subtitle: { ...typography.body, color: colors.textMuted, marginTop: spacing.xs, marginBottom: spacing.sm },
-  label: { ...typography.small, fontWeight: '700', color: colors.textMuted, marginBottom: 6, marginTop: spacing.md },
+  subtitle: {
+    ...typography.body,
+    color: colors.textMuted,
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  label: {
+    ...typography.small,
+    fontWeight: '700',
+    color: colors.textMuted,
+    marginBottom: 6,
+    marginTop: spacing.md,
+  },
   input: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -313,7 +390,12 @@ const styles = StyleSheet.create({
     ...typography.body,
     backgroundColor: colors.surface,
   },
-  demoHint: { ...typography.small, color: colors.textFaint, textAlign: 'center', marginTop: spacing.lg },
+  demoHint: {
+    ...typography.small,
+    color: colors.textFaint,
+    textAlign: 'center',
+    marginTop: spacing.lg,
+  },
   loggedHeader: { alignItems: 'center' },
   avatar: {
     width: 64,
@@ -334,17 +416,57 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.lg,
   },
-  loyaltyTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  loyaltyTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
   loyaltyCardLabel: { color: colors.textFaint, ...typography.small },
-  loyaltyCardName: { color: colors.onBrand, ...typography.bodyStrong, marginTop: 2 },
-  tierBadge: { backgroundColor: colors.brand, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: 5 },
-  tierBadgeText: { color: colors.onBrand, ...typography.small, fontWeight: '700' },
-  loyaltyBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
-  loyaltyPointsValue: { color: colors.brand, fontSize: 26, fontWeight: '800', marginTop: 2 },
-  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
+  loyaltyCardName: {
+    color: colors.onBrand,
+    ...typography.bodyStrong,
+    marginTop: 2,
+  },
+  tierBadge: {
+    backgroundColor: colors.brand,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 5,
+  },
+  tierBadgeText: {
+    color: colors.onBrand,
+    ...typography.small,
+    fontWeight: '700',
+  },
+  loyaltyBottom: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
+  loyaltyPointsValue: {
+    color: colors.brand,
+    fontSize: 26,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
   sectionTitle: { ...typography.h2, color: colors.text },
-  sectionAction: { ...typography.caption, color: colors.brand, fontWeight: '700' },
-  sectionSubtitle: { ...typography.caption, color: colors.textMuted, marginTop: 2, marginBottom: spacing.md },
+  sectionAction: {
+    ...typography.caption,
+    color: colors.brand,
+    fontWeight: '700',
+  },
+  sectionSubtitle: {
+    ...typography.caption,
+    color: colors.textMuted,
+    marginTop: 2,
+    marginBottom: spacing.md,
+  },
   emptyHint: { ...typography.body, color: colors.textMuted },
   favoriteRow: {
     flexDirection: 'row',
@@ -354,7 +476,11 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
   },
   favoriteName: { ...typography.bodyStrong, color: colors.text },
-  favoritePrice: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+  favoritePrice: {
+    ...typography.caption,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
   purchaseRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -371,8 +497,17 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
   },
-  menuLabel: { flex: 1, ...typography.body, fontWeight: '600', color: colors.text },
-  menuDivider: { height: 1, backgroundColor: colors.border, marginLeft: spacing.lg },
+  menuLabel: {
+    flex: 1,
+    ...typography.body,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginLeft: spacing.lg,
+  },
   budgetRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   budgetPrefix: { ...typography.bodyStrong, color: colors.textMuted },
   budgetInput: {
@@ -384,5 +519,10 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     ...typography.body,
   },
-  budgetCurrent: { ...typography.caption, color: colors.brandDark, marginTop: spacing.sm, fontWeight: '600' },
+  budgetCurrent: {
+    ...typography.caption,
+    color: colors.brandDark,
+    marginTop: spacing.sm,
+    fontWeight: '600',
+  },
 });

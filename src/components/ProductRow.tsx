@@ -3,11 +3,12 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Icon } from './ui';
 import { colors, radius, spacing, typography } from '../theme/tokens';
 import { CartItem } from '../types';
-import { computeLineTotal, formatBRL, formatKg } from '../utils/pricing';
+import { computeLineTotal, LineTotal, formatBRL, formatKg } from '../utils/pricing';
 
 type Props = {
   item: CartItem;
   extraPercentOff?: number;
+  lineTotal?: LineTotal;
   isFavorite?: boolean;
   onToggleFavorite?: () => void;
   onIncrement: () => void;
@@ -18,13 +19,15 @@ type Props = {
 export function ProductRow({
   item,
   extraPercentOff = 0,
+  lineTotal,
   isFavorite,
   onToggleFavorite,
   onIncrement,
   onDecrement,
   onRemove,
 }: Props) {
-  const { originalTotal, finalTotal, savings } = computeLineTotal(item, extraPercentOff);
+  const { originalTotal, finalTotal, savings } =
+    lineTotal ?? computeLineTotal(item, extraPercentOff);
   const hasPromotion = savings > 0;
 
   return (
@@ -35,7 +38,11 @@ export function ProductRow({
             {item.product.name}
           </Text>
           {onToggleFavorite ? (
-            <TouchableOpacity onPress={onToggleFavorite} hitSlop={8} accessibilityLabel="Favoritar produto">
+            <TouchableOpacity
+              onPress={onToggleFavorite}
+              hitSlop={8}
+              accessibilityLabel="Favoritar produto"
+            >
               <Icon name="heart" size={16} color={isFavorite ? colors.danger : colors.textFaint} />
             </TouchableOpacity>
           ) : null}
@@ -58,19 +65,25 @@ export function ProductRow({
       </View>
 
       <View style={styles.quantityControl}>
-        <TouchableOpacity style={styles.stepButton} onPress={onDecrement} accessibilityLabel="Diminuir quantidade">
+        <TouchableOpacity
+          style={styles.stepButton}
+          onPress={onDecrement}
+          accessibilityLabel="Diminuir quantidade"
+        >
           <Text style={styles.stepButtonText}>–</Text>
         </TouchableOpacity>
         <Text style={styles.quantity}>{item.quantity}</Text>
-        <TouchableOpacity style={styles.stepButton} onPress={onIncrement} accessibilityLabel="Aumentar quantidade">
+        <TouchableOpacity
+          style={styles.stepButton}
+          onPress={onIncrement}
+          accessibilityLabel="Aumentar quantidade"
+        >
           <Text style={styles.stepButtonText}>+</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.totals}>
-        {hasPromotion ? (
-          <Text style={styles.originalTotal}>{formatBRL(originalTotal)}</Text>
-        ) : null}
+        {hasPromotion ? <Text style={styles.originalTotal}>{formatBRL(originalTotal)}</Text> : null}
         <Text style={styles.finalTotal}>{formatBRL(finalTotal)}</Text>
         <TouchableOpacity onPress={onRemove} accessibilityLabel="Remover item" hitSlop={8}>
           <Text style={styles.removeText}>remover</Text>
@@ -94,9 +107,23 @@ const styles = StyleSheet.create({
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   name: { ...typography.bodyStrong, color: colors.text, flexShrink: 1 },
   unitPrice: { ...typography.small, color: colors.textMuted, marginTop: 2 },
-  promoLabel: { ...typography.small, color: colors.danger, marginTop: 4, fontWeight: '600' },
-  memberLabel: { ...typography.small, color: colors.brand, marginTop: 2, fontWeight: '600' },
-  quantityControl: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  promoLabel: {
+    ...typography.small,
+    color: colors.danger,
+    marginTop: 4,
+    fontWeight: '600',
+  },
+  memberLabel: {
+    ...typography.small,
+    color: colors.brand,
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  quantityControl: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   stepButton: {
     width: 28,
     height: 28,
@@ -105,10 +132,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stepButtonText: { color: '#fff', fontSize: 18, fontWeight: '700', lineHeight: 20 },
-  quantity: { minWidth: 20, textAlign: 'center', ...typography.bodyStrong, color: colors.text },
+  stepButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
+    lineHeight: 20,
+  },
+  quantity: {
+    minWidth: 20,
+    textAlign: 'center',
+    ...typography.bodyStrong,
+    color: colors.text,
+  },
   totals: { alignItems: 'flex-end', minWidth: 90 },
-  originalTotal: { ...typography.small, color: colors.textFaint, textDecorationLine: 'line-through' },
+  originalTotal: {
+    ...typography.small,
+    color: colors.textFaint,
+    textDecorationLine: 'line-through',
+  },
   finalTotal: { ...typography.bodyStrong, color: colors.text },
   removeText: { ...typography.small, color: colors.danger, marginTop: 4 },
 });

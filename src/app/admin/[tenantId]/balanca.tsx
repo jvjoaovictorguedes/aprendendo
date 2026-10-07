@@ -28,6 +28,8 @@ import { formatBRL, formatKg } from '../../../utils/pricing';
 import {
   buildScaleLabel,
   parseScaleLabel,
+  PRICE_20_SCALE_CONFIG,
+  WEIGHT_2_SCALE_CONFIG,
   resolveScaleLabel,
   ScaleLabelConfig,
   ScaleValueType,
@@ -38,6 +40,14 @@ type Preset = { label: string; config: Omit<ScaleLabelConfig, 'enabled' | 'valid
 
 // Layouts mais comuns das balanças no Brasil (Toledo, Filizola, Urano...).
 const PRESETS: Preset[] = [
+  {
+    label: 'Preço total · prefixo 20 · PLU 5 (opção A)',
+    config: PRICE_20_SCALE_CONFIG,
+  },
+  {
+    label: 'Peso · prefixo 2 · PLU 5 (opção B)',
+    config: WEIGHT_2_SCALE_CONFIG,
+  },
   {
     label: 'Preço total · PLU 4',
     config: { prefix: '2', pluLength: 4, valueType: 'price', valueLength: 5, valueDecimals: 2 },
@@ -180,7 +190,7 @@ function Simulator({ tenantId, config }: { tenantId: string; config: ScaleLabelC
         {!codeToRead ? null : !label ? (
           <Text style={styles.resultError}>
             Este código não é reconhecido como etiqueta de balança com a configuração atual — o app
-            vai tratá-lo como código de barras comum.
+            recusará etiquetas com o prefixo configurado e dados inválidos.
           </Text>
         ) : (
           <>
@@ -191,7 +201,9 @@ function Simulator({ tenantId, config }: { tenantId: string; config: ScaleLabelC
             {product === undefined ? null : product ? (
               <Text style={styles.resultLine}>
                 {product.name} ({formatBRL(product.price)}/{product.unit}) →{' '}
-                {resolved ? `${formatKg(resolved.weightKg, resolved.weightIsEstimated)} · ${formatBRL(resolved.total)}` : ''}
+                {resolved
+                  ? `${formatKg(resolved.weightKg, resolved.weightIsEstimated)} · ${formatBRL(resolved.total)}`
+                  : ''}
               </Text>
             ) : (
               <Text style={styles.resultError}>
@@ -249,7 +261,10 @@ export default function ScaleSettingsScreen() {
       const next = { ...settings, scale: config };
       await saveTenantSettings(tenantId, next);
       setSettings(next);
-      setStatus({ kind: 'success', message: 'Configuração da balança salva. O app passa a usar na próxima abertura.' });
+      setStatus({
+        kind: 'success',
+        message: 'Configuração da balança salva. O app passa a usar na próxima abertura.',
+      });
     } catch (err) {
       setStatus({ kind: 'error', message: describeError(err) });
     } finally {
@@ -265,7 +280,11 @@ export default function ScaleSettingsScreen() {
       backLabel={tenant?.name ?? 'Franquia'}
     >
       {!form || !config ? (
-        status ? <StatusMessage status={status} /> : <Loading />
+        status ? (
+          <StatusMessage status={status} />
+        ) : (
+          <Loading />
+        )
       ) : (
         <>
           <AdminSection
@@ -286,7 +305,12 @@ export default function ScaleSettingsScreen() {
           >
             <View style={styles.presets}>
               {PRESETS.map((preset) => (
-                <Button key={preset.label} label={preset.label} variant="secondary" onPress={() => applyPreset(preset)} />
+                <Button
+                  key={preset.label}
+                  label={preset.label}
+                  variant="secondary"
+                  onPress={() => applyPreset(preset)}
+                />
               ))}
             </View>
 
@@ -301,7 +325,7 @@ export default function ScaleSettingsScreen() {
               }
               hint={
                 form.valueType === 'price'
-                  ? 'Recomendado: o valor que o cliente vê é exatamente o que o caixa cobra.'
+                  ? 'O total impresso é a base do carrinho; descontos do app podem alterá-lo. Confira as regras do caixa.'
                   : 'O app calcula peso × preço do kg cadastrado.'
               }
             />
@@ -325,7 +349,9 @@ export default function ScaleSettingsScreen() {
               <Field
                 label="Dígitos do valor"
                 value={form.valueLength}
-                onChangeText={(valueLength) => update({ valueLength: valueLength.replace(/\D/g, '') })}
+                onChangeText={(valueLength) =>
+                  update({ valueLength: valueLength.replace(/\D/g, '') })
+                }
                 keyboardType="number-pad"
                 maxLength={1}
                 hint="De 4 a 6"
@@ -333,7 +359,9 @@ export default function ScaleSettingsScreen() {
               <Field
                 label="Casas decimais"
                 value={form.valueDecimals}
-                onChangeText={(valueDecimals) => update({ valueDecimals: valueDecimals.replace(/\D/g, '') })}
+                onChangeText={(valueDecimals) =>
+                  update({ valueDecimals: valueDecimals.replace(/\D/g, '') })
+                }
                 keyboardType="number-pad"
                 maxLength={1}
                 hint={form.valueType === 'price' ? '2 = centavos' : '3 = gramas'}
@@ -345,7 +373,9 @@ export default function ScaleSettingsScreen() {
               value={form.validateCheckDigit}
               onChange={(validateCheckDigit) => update({ validateCheckDigit })}
             />
-            <StatusMessage status={layoutError ? { kind: 'error', message: layoutError } : status} />
+            <StatusMessage
+              status={layoutError ? { kind: 'error', message: layoutError } : status}
+            />
             <Button
               label="Salvar configuração"
               onPress={handleSave}
@@ -355,7 +385,6 @@ export default function ScaleSettingsScreen() {
           </AdminSection>
 
           {!layoutError ? <Simulator tenantId={tenantId} config={config} /> : null}
-
         </>
       )}
     </AdminPage>

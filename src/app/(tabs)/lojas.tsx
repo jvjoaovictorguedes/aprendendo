@@ -1,63 +1,91 @@
-import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-
-import { Icon } from '../../components/ui';
-import { STORES } from '../../data/stores';
-import { colors, radius, spacing, typography } from '../../theme/tokens';
-
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { ActivityIndicator, Linking, ScrollView, Text } from 'react-native';
+import { Button, Card } from '../../components/ui';
+import { useStore } from '../../context/StoreContext';
+import { useCart } from '../../context/CartContext';
+import { colors, spacing, typography } from '../../theme/tokens';
 export default function StoresScreen() {
-  const openMaps = (mapsQuery: string) => {
-    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`;
-    Linking.openURL(url).catch(() => {});
-  };
-
+  const { stores, storeId, selectStore, loading, error, reload } = useStore();
+  const { items, clearCart } = useCart();
+  const [pending, setPending] = useState<{ id: string | null } | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      void reload();
+    }, [reload]),
+  );
+  function choose(id: string | null) {
+    if (id === storeId) return;
+    if (items.length) {
+      setPending({ id });
+      return;
+    }
+    selectStore(id);
+  }
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}>
-      {STORES.map((store) => (
-        <View key={store.id} style={styles.card}>
-          <View style={styles.iconWrap}>
-            <Icon name="map-pin" size={20} color={colors.brand} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.name}>{store.name}</Text>
-            <Text style={styles.address}>{store.address}</Text>
-            <Text style={styles.hours}>{store.hours}</Text>
-            <TouchableOpacity style={styles.routeButton} onPress={() => openMaps(store.mapsQuery)}>
-              <Icon name="navigation" size={14} color={colors.brand} />
-              <Text style={styles.routeButtonText}>Ver rota</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: colors.surfaceAlt }}
+      contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}
+    >
+      <Text style={{ ...typography.h1, color: colors.text }}>Escolha sua loja</Text>
+      <Text style={{ color: colors.textMuted }}>
+        A escolha filtra as ofertas. Você pode continuar sem selecionar uma loja.
+      </Text>
+      {pending ? (
+        <Card>
+          <Text>
+            Trocar de loja limpa o carrinho para não misturar preços e benefícios de lojas
+            diferentes.
+          </Text>
+          <Button
+            label="Limpar carrinho e trocar"
+            onPress={() => {
+              clearCart();
+              selectStore(pending.id);
+              setPending(null);
+            }}
+          />
+          <Button label="Manter loja atual" variant="ghost" onPress={() => setPending(null)} />
+        </Card>
+      ) : null}
+      <Button
+        label={storeId ? 'Ver ofertas de toda a rede' : 'Toda a rede selecionada ✓'}
+        variant="secondary"
+        onPress={() => choose(null)}
+      />
+      {loading ? <ActivityIndicator color={colors.brand} /> : null}
+      {error ? (
+        <>
+          <Text style={{ color: colors.danger }}>{error}</Text>
+          <Button label="Tentar novamente" onPress={() => void reload()} disabled={loading} />
+        </>
+      ) : null}
+      {!loading && !error && !stores.length ? (
+        <Text>Nenhuma loja cadastrada. As ofertas gerais continuam disponíveis.</Text>
+      ) : null}
+      {stores.map((s) => (
+        <Card key={s.id} style={{ gap: spacing.sm }}>
+          <Text style={{ ...typography.h2, color: colors.text }}>{s.name}</Text>
+          <Text>{s.address}</Text>
+          <Text>{s.hours}</Text>
+          <Button
+            label={storeId === s.id ? 'Loja selecionada ✓' : 'Escolher esta loja'}
+            onPress={() => choose(s.id)}
+            variant={storeId === s.id ? 'secondary' : 'primary'}
+          />
+          {s.address ? (
+            <Button
+              label="Ver rota"
+              variant="ghost"
+              onPress={() =>
+                void Linking.openURL(
+                  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.address!)}`,
+                )
+              }
+            />
+          ) : null}
+        </Card>
       ))}
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surfaceAlt },
-  card: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    padding: spacing.lg,
-  },
-  iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: colors.brandSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  name: { ...typography.bodyStrong, color: colors.text, fontSize: 16 },
-  address: { ...typography.body, color: colors.textMuted, marginTop: 4 },
-  hours: { ...typography.caption, color: colors.textFaint, marginTop: 2 },
-  routeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: spacing.sm,
-    alignSelf: 'flex-start',
-  },
-  routeButtonText: { ...typography.caption, color: colors.brand, fontWeight: '700' },
-});

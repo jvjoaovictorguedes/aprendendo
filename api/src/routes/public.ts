@@ -13,7 +13,7 @@ import {
   type SettingsRow,
   type TenantRow,
 } from '../mappers.js';
-import { normalizePlu, tenantIdHeader } from '../validation.js';
+import { normalizePlu, tenantIdHeader, uuid } from '../validation.js';
 
 export async function publicRoutes(app: FastifyInstance, { db }: Deps) {
   async function requestTenant(request: FastifyRequest): Promise<TenantRow> {
@@ -23,7 +23,12 @@ export async function publicRoutes(app: FastifyInstance, { db }: Deps) {
     return rows[0];
   }
 
-  async function findProduct(tenantId: string, column: 'barcode' | 'plu', code: string) {
+  async function findProduct(
+    tenantId: string,
+    column: 'barcode' | 'plu',
+    code: string,
+    storeId?: string,
+  ) {
     const { rows } = await db.query<ProductRow>(
       `select * from products where tenant_id = $1 and ${column} = $2 and active`,
       [tenantId, code],
@@ -32,12 +37,14 @@ export async function publicRoutes(app: FastifyInstance, { db }: Deps) {
     if (!product) throw notFound('Produto não cadastrado.');
 
     const promotions = await db.query<PromotionRow>(
-      `select kind, label, percent, buy_qty, pay_qty, fixed_price
+      `select *
        from promotions
-       where product_id = $1 and active and starts_at <= now() and (ends_at is null or ends_at > now())
-       order by starts_at desc
+       where product_id = $1 and tenant_id=$2 and audience='all' and active
+       and (store_id is null or store_id=$3)
+       and (store_id is null or exists(select 1 from stores s where s.id=store_id and s.active)) and starts_at <= now() and (ends_at is null or ends_at > now())
+       order by starts_at desc, id desc
        limit 1`,
-      [product.id],
+      [product.id, tenantId, storeId ?? null],
     );
     return toAppProduct(product, promotions.rows[0] ?? null);
   }
@@ -45,12 +52,19 @@ export async function publicRoutes(app: FastifyInstance, { db }: Deps) {
   /** Nome, cor e logo da franquia — só isso (plano/território ficam de fora). */
   app.get('/brand', async (request) => {
     const tenant = await requestTenant(request);
-    return { name: tenant.name, accentColor: tenant.accent_color, logoUrl: tenant.logo_url };
+    return {
+      name: tenant.name,
+      accentColor: tenant.accent_color,
+      logoUrl: tenant.logo_url,
+    };
   });
 
   app.get('/settings', async (request) => {
     const tenant = await requestTenant(request);
-    const { rows } = await db.query<SettingsRow>('select * from tenant_settings where tenant_id = $1', [tenant.id]);
+    const { rows } = await db.query<SettingsRow>(
+      'select * from tenant_settings where tenant_id = $1',
+      [tenant.id],
+    );
     if (!rows[0]) throw notFound('Configuração da franquia não encontrada.');
     return toSettings(rows[0]);
   });
@@ -58,12 +72,14 @@ export async function publicRoutes(app: FastifyInstance, { db }: Deps) {
   app.get('/products/barcode/:code', async (request) => {
     const tenant = await requestTenant(request);
     const { code } = z.object({ code: z.string().regex(/^[0-9]{6,14}$/) }).parse(request.params);
-    return findProduct(tenant.id, 'barcode', code);
+    const { storeId } = z.object({ storeId: uuid.optional() }).parse(request.query);
+    return findProduct(tenant.id, 'barcode', code, storeId);
   });
 
   app.get('/products/plu/:plu', async (request) => {
     const tenant = await requestTenant(request);
     const { plu } = z.object({ plu: z.string().regex(/^[0-9]{1,6}$/) }).parse(request.params);
-    return findProduct(tenant.id, 'plu', normalizePlu(plu));
+    const { storeId } = z.object({ storeId: uuid.optional() }).parse(request.query);
+    return findProduct(tenant.id, 'plu', normalizePlu(plu), storeId);
   });
 }

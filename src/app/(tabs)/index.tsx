@@ -1,7 +1,15 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 import { Badge, Button, Card, Icon, Section } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
@@ -10,12 +18,12 @@ import { useHistory } from '../../context/HistoryContext';
 import { useLists } from '../../context/ListsContext';
 import { useNotifications } from '../../context/NotificationsContext';
 import { usePromotions } from '../../context/PromotionsContext';
-import { MEMBER_PROMOTIONS } from '../../data/memberPromotions';
+import { StoreSelector } from '../../components/StoreSelector';
+import { isApiConfigured } from '../../services/api';
+import { offerPromotion } from '../../utils/offers';
 import { MOCK_PRODUCTS } from '../../data/products';
 import { brand, colors, radius, spacing, typography } from '../../theme/tokens';
-import { computeCartTotals, formatBRL } from '../../utils/pricing';
-
-const storeOffers = MOCK_PRODUCTS.filter((product) => product.promotion).slice(0, 3);
+import { computeCartTotals, computeLineTotal, formatBRL } from '../../utils/pricing';
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -28,29 +36,42 @@ export default function HomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { items, addByBarcode } = useCart();
-  const { extraPercentOffFor } = usePromotions();
+  const { extraPercentOffFor, offers } = usePromotions();
+  const storeOffers = offers
+    .filter((o) => o.audience === 'all')
+    .slice(0, 3)
+    .map((o) => ({ ...o.product, promotion: offerPromotion(o) }));
   const { lists } = useLists();
   const { purchases } = useHistory();
   const { unreadCount } = useNotifications();
   const [query, setQuery] = useState('');
+  const [addError, setAddError] = useState<string | null>(null);
 
   const totals = computeCartTotals(items, extraPercentOffFor);
   const hasActiveCart = items.length > 0;
   const recentLists = lists.slice(0, 2);
   const recentPurchase = purchases[0];
-  const availableMemberOffers = MEMBER_PROMOTIONS.length;
+  const availableMemberOffers = offers.filter((o) => o.audience === 'club').length;
 
   const searchMatches = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     if (!normalized) return [];
-    return MOCK_PRODUCTS.filter((product) => product.name.toLowerCase().includes(normalized)).slice(
-      0,
-      4,
-    );
-  }, [query]);
+    return (
+      isApiConfigured
+        ? Array.from(new Map(offers.map((o) => [o.product.barcode, o.product])).values())
+        : MOCK_PRODUCTS
+    )
+      .filter((product) => product.name.toLowerCase().includes(normalized))
+      .slice(0, 4);
+  }, [query, offers]);
 
   const handleQuickAdd = async (barcode: string) => {
-    await addByBarcode(barcode);
+    const result = await addByBarcode(barcode);
+    if (result.status !== 'added') {
+      setAddError(result.status === 'error' ? result.message : 'Produto indisponível na loja.');
+      return;
+    }
+    setAddError(null);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     setQuery('');
   };
@@ -59,7 +80,11 @@ export default function HomeScreen() {
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
       <View style={styles.header}>
         {brand.logoUrl ? (
-          <Image source={{ uri: brand.logoUrl }} style={styles.logo} accessibilityLabel={brand.name} />
+          <Image
+            source={{ uri: brand.logoUrl }}
+            style={styles.logo}
+            accessibilityLabel={brand.name}
+          />
         ) : null}
         <View style={{ flex: 1 }}>
           <Text style={styles.greeting}>
@@ -82,12 +107,16 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
+      <StoreSelector />
+      {addError ? (
+        <Text style={{ color: colors.danger, padding: spacing.md }}>{addError}</Text>
+      ) : null}
       <View style={styles.sectionPadding}>
         <View style={styles.searchBar}>
           <Icon name="search" size={17} color={colors.textFaint} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Buscar produtos, ofertas…"
+            placeholder="Buscar ofertas por produto…"
             placeholderTextColor={colors.textFaint}
             value={query}
             onChangeText={setQuery}
@@ -176,21 +205,44 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      <Section title="Ofertas para você" actionLabel="Ver todas" onAction={() => router.push('/promotions')}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: spacing.md }}>
+      <Section
+        title="Ofertas para você"
+        actionLabel="Ver todas"
+        onAction={() => router.push('/promotions')}
+      >
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingHorizontal: spacing.lg,
+            gap: spacing.md,
+          }}
+        >
           {storeOffers.map((product) => (
             <Card key={product.barcode} style={styles.offerCard}>
               <Badge label={product.promotion?.label ?? ''} variant="danger" />
               <Text style={styles.offerName} numberOfLines={2}>
                 {product.name}
               </Text>
-              <Text style={styles.offerPrice}>{formatBRL(product.price)}</Text>
+              <Text style={styles.offerPrice}>
+                {formatBRL(
+                  computeLineTotal({
+                    product,
+                    quantity: product.promotion?.kind === 'buyXPayY' ? product.promotion.buy : 1,
+                  }).finalTotal,
+                )}
+                {product.promotion?.kind === 'buyXPayY'
+                  ? ` por ${product.promotion.buy} unidades`
+                  : `/${product.unit}`}
+              </Text>
             </Card>
           ))}
           {availableMemberOffers > 0 ? (
             <Card style={[styles.offerCard, { backgroundColor: colors.brandSoft }]}>
               <Badge label="Exclusivo" variant="brand" />
-              <Text style={styles.offerName}>{availableMemberOffers} ofertas de cliente disponíveis</Text>
+              <Text style={styles.offerName}>
+                {availableMemberOffers} ofertas de cliente disponíveis
+              </Text>
               <Text style={styles.offerLink}>Ativar na aba Ofertas</Text>
             </Card>
           ) : null}
@@ -198,16 +250,23 @@ export default function HomeScreen() {
       </Section>
 
       <View style={styles.sectionPadding}>
-        <TouchableOpacity style={styles.couponBanner} onPress={() => router.push(user ? '/promotions' : '/profile')}>
+        <TouchableOpacity
+          style={styles.couponBanner}
+          onPress={() => router.push(user ? '/promotions' : '/profile')}
+        >
           <View style={styles.couponIconWrap}>
             <Icon name="tag" size={20} color={colors.brand} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.couponTitle}>
-              {user ? `Você tem ${availableMemberOffers} cupons disponíveis` : 'Faça login para ver cupons exclusivos'}
+              {user
+                ? `Você tem ${availableMemberOffers} cupons disponíveis`
+                : 'Faça login para ver cupons exclusivos'}
             </Text>
             <Text style={styles.couponSubtitle}>
-              {user ? 'Economize ativando antes de bipar' : 'Entre na aba Conta para desbloquear'}
+              {user
+                ? 'Ative nas ofertas ou durante a compra'
+                : 'Entre na aba Conta para desbloquear'}
             </Text>
           </View>
           <Icon name="chevron-right" size={18} color={colors.textFaint} />
@@ -244,7 +303,11 @@ export default function HomeScreen() {
         </View>
       </Section>
 
-      <Section title="Compras recentes" actionLabel="Ver tudo" onAction={() => router.push('/historico')}>
+      <Section
+        title="Compras recentes"
+        actionLabel="Ver tudo"
+        onAction={() => router.push('/historico')}
+      >
         <View style={styles.sectionPadding}>
           {recentPurchase ? (
             <TouchableOpacity onPress={() => router.push('/historico')}>
@@ -282,9 +345,19 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     gap: spacing.sm,
   },
-  logo: { width: 44, height: 44, borderRadius: radius.md, marginRight: spacing.md },
+  logo: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.md,
+    marginRight: spacing.md,
+  },
   greeting: { ...typography.h1, color: colors.text },
-  storeRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  storeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
   store: { ...typography.caption, color: colors.textMuted },
   bellButton: {
     width: 42,
@@ -319,7 +392,12 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     paddingHorizontal: spacing.lg,
   },
-  searchInput: { flex: 1, paddingVertical: spacing.md, ...typography.body, color: colors.text },
+  searchInput: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    ...typography.body,
+    color: colors.text,
+  },
   searchResults: { marginTop: spacing.sm, padding: spacing.sm },
   searchRow: {
     flexDirection: 'row',
@@ -357,7 +435,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   ctaTitle: { ...typography.h2, color: colors.onBrand },
-  ctaSubtitle: { ...typography.caption, color: colors.onBrand, opacity: 0.9, marginTop: 2 },
+  ctaSubtitle: {
+    ...typography.caption,
+    color: colors.onBrand,
+    opacity: 0.9,
+    marginTop: 2,
+  },
   quickActions: {
     marginTop: spacing.lg,
     flexDirection: 'row',
@@ -375,15 +458,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  quickActionLabel: { ...typography.small, color: colors.textMuted, textAlign: 'center' },
-  cartRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  quickActionLabel: {
+    ...typography.small,
+    color: colors.textMuted,
+    textAlign: 'center',
+  },
+  cartRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   cartLabel: { ...typography.caption, color: colors.textMuted },
   cartItemCount: { ...typography.bodyStrong, color: colors.text, marginTop: 2 },
   cartTotal: { ...typography.h1, color: colors.text },
   offerCard: { width: 160 },
-  offerName: { ...typography.bodyStrong, color: colors.text, marginTop: spacing.sm },
+  offerName: {
+    ...typography.bodyStrong,
+    color: colors.text,
+    marginTop: spacing.sm,
+  },
   offerPrice: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
-  offerLink: { ...typography.small, color: colors.brandDark, marginTop: 2, fontWeight: '700' },
+  offerLink: {
+    ...typography.small,
+    color: colors.brandDark,
+    marginTop: 2,
+    fontWeight: '700',
+  },
   couponBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -403,8 +503,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   couponTitle: { ...typography.bodyStrong, color: colors.text },
-  couponSubtitle: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+  couponSubtitle: {
+    ...typography.caption,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
   listName: { ...typography.bodyStrong, color: colors.text },
-  listProgress: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+  listProgress: {
+    ...typography.caption,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
   emptyHint: { ...typography.body, color: colors.textMuted },
 });

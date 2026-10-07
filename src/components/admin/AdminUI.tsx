@@ -31,7 +31,14 @@ type PageProps = PropsWithChildren<{
   actions?: ReactNode;
 }>;
 
-export function AdminPage({ title, subtitle, onBack, backLabel = 'Voltar', actions, children }: PageProps) {
+export function AdminPage({
+  title,
+  subtitle,
+  onBack,
+  backLabel = 'Voltar',
+  actions,
+  children,
+}: PageProps) {
   const insets = useSafeAreaInsets();
   return (
     <KeyboardAvoidingView
@@ -68,7 +75,11 @@ export function AdminPage({ title, subtitle, onBack, backLabel = 'Voltar', actio
   );
 }
 
-export function AdminSection({ title, description, children }: PropsWithChildren<{ title: string; description?: string }>) {
+export function AdminSection({
+  title,
+  description,
+  children,
+}: PropsWithChildren<{ title: string; description?: string }>) {
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -82,7 +93,9 @@ export function AdminSection({ title, description, children }: PropsWithChildren
 export function FieldRow({ children }: PropsWithChildren) {
   return (
     <View style={styles.fieldRow}>
-      {Children.map(children, (child) => (child ? <View style={styles.fieldCell}>{child}</View> : null))}
+      {Children.map(children, (child) =>
+        child ? <View style={styles.fieldCell}>{child}</View> : null,
+      )}
     </View>
   );
 }
@@ -100,9 +113,19 @@ export function Field({ label, hint, error, style, ...inputProps }: FieldProps) 
       <TextInput
         placeholderTextColor={colors.textFaint}
         {...inputProps}
-        style={[styles.input, error ? styles.inputError : null, inputProps.editable === false && styles.inputDisabled, style]}
+        accessibilityLabel={inputProps.accessibilityLabel ?? label}
+        style={[
+          styles.input,
+          error ? styles.inputError : null,
+          inputProps.editable === false && styles.inputDisabled,
+          style,
+        ]}
       />
-      {error ? <Text style={styles.errorText}>{error}</Text> : hint ? <Text style={styles.hint}>{hint}</Text> : null}
+      {error ? (
+        <Text style={styles.errorText}>{error}</Text>
+      ) : hint ? (
+        <Text style={styles.hint}>{hint}</Text>
+      ) : null}
     </View>
   );
 }
@@ -139,7 +162,9 @@ export function Segmented<T extends string>({
               accessibilityRole="button"
               accessibilityState={{ selected }}
             >
-              <Text style={[styles.segmentText, selected && styles.segmentTextSelected]}>{option.label}</Text>
+              <Text style={[styles.segmentText, selected && styles.segmentTextSelected]}>
+                {option.label}
+              </Text>
             </TouchableOpacity>
           );
         })}
@@ -167,6 +192,7 @@ export function ToggleRow({
         {description ? <Text style={styles.hint}>{description}</Text> : null}
       </View>
       <Switch
+        accessibilityLabel={label}
         value={value}
         onValueChange={onChange}
         trackColor={{ true: colors.brand, false: colors.border }}
@@ -183,8 +209,14 @@ export function StatusMessage({ status }: { status: Status }) {
   const isError = status.kind === 'error';
   return (
     <View style={[styles.status, isError ? styles.statusError : styles.statusSuccess]}>
-      <Icon name={isError ? 'alert-circle' : 'check-circle'} size={16} color={isError ? colors.danger : colors.brandDark} />
-      <Text style={[styles.statusText, { color: isError ? colors.danger : colors.brandDark }]}>{status.message}</Text>
+      <Icon
+        name={isError ? 'alert-circle' : 'check-circle'}
+        size={16}
+        color={isError ? colors.danger : colors.brandDark}
+      />
+      <Text style={[styles.statusText, { color: isError ? colors.danger : colors.brandDark }]}>
+        {status.message}
+      </Text>
     </View>
   );
 }
@@ -236,7 +268,11 @@ export function formatDecimalInput(value: number): string {
 
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.surfaceAlt },
-  topBar: { backgroundColor: colors.surfaceDark, paddingBottom: spacing.md, paddingHorizontal: spacing.lg },
+  topBar: {
+    backgroundColor: colors.surfaceDark,
+    paddingBottom: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
   topBarInner: { width: '100%', maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center' },
   brand: { color: '#fff', ...typography.bodyStrong },
   scroll: { padding: spacing.lg },
@@ -259,7 +295,12 @@ const styles = StyleSheet.create({
   fieldRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   fieldCell: { flexGrow: 1, flexBasis: 220 },
   field: { gap: 6 },
-  label: { ...typography.small, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4 },
+  label: {
+    ...typography.small,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
   input: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -282,7 +323,13 @@ const styles = StyleSheet.create({
     padding: 3,
     gap: 3,
   },
-  segment: { flexGrow: 1, paddingVertical: 8, paddingHorizontal: spacing.md, borderRadius: 6, alignItems: 'center' },
+  segment: {
+    flexGrow: 1,
+    paddingVertical: 8,
+    paddingHorizontal: spacing.md,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
   segmentSelected: { backgroundColor: colors.surface },
   segmentText: { ...typography.caption, color: colors.textMuted, fontWeight: '600' },
   segmentTextSelected: { color: colors.text },

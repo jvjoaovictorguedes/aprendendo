@@ -39,7 +39,9 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:pricing": "node api/node_modules/tsx/dist/cli.mjs --test tests/pricing.test.mjs",
+    "test:scale": "node api/node_modules/tsx/dist/cli.mjs --test tests/scaleLabel.test.mjs"
   },
   "private": true
 }

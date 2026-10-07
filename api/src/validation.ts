@@ -15,11 +15,7 @@ export function normalizePlu(plu: string): string {
   return plu.replace(/\D/g, '').replace(/^0+/, '');
 }
 
-export const email = z
-  .string()
-  .trim()
-  .toLowerCase()
-  .pipe(z.email('E-mail inválido.'));
+export const email = z.string().trim().toLowerCase().pipe(z.email('E-mail inválido.'));
 
 export const password = z.string().min(8, 'A senha precisa ter pelo menos 8 caracteres.').max(200);
 
@@ -41,7 +37,10 @@ export const settingsBody = z
   })
   .refine(
     (value) => value.scale.prefix.length + value.scale.pluLength + value.scale.valueLength <= 12,
-    { message: 'Prefixo + PLU + valor passam de 12 dígitos — não cabem num EAN-13.', path: ['scale'] },
+    {
+      message: 'Prefixo + PLU + valor passam de 12 dígitos — não cabem num EAN-13.',
+      path: ['scale'],
+    },
   );
 
 export const productBody = z
@@ -58,7 +57,10 @@ export const productBody = z
       .string()
       .nullish()
       .transform((value) => (value ? normalizePlu(value) || null : null))
-      .refine((value) => value === null || /^[1-9][0-9]{0,5}$/.test(value), 'PLU deve ter até 6 dígitos.'),
+      .refine(
+        (value) => value === null || /^[1-9][0-9]{0,5}$/.test(value),
+        'PLU deve ter até 6 dígitos.',
+      ),
     price: z.number().min(0, 'Preço inválido.').max(99_999_999),
     unit: z.enum(['un', 'kg']),
     active: z.boolean().default(true),
@@ -71,3 +73,17 @@ export const productBody = z
     message: 'Produto vendido por kg precisa do PLU da balança.',
     path: ['plu'],
   });
+
+/** Valida os dígitos verificadores, além do formato do CPF. */
+export function validCpf(value: string): boolean {
+  if (!/^[0-9]{11}$/.test(value) || /^(\d)\1{10}$/.test(value)) return false;
+  for (const length of [9, 10]) {
+    const sum = [...value.slice(0, length)].reduce(
+      (total, digit, index) => total + Number(digit) * (length + 1 - index),
+      0,
+    );
+    const digit = (sum * 10) % 11;
+    if (Number(value[length]) !== (digit === 10 ? 0 : digit)) return false;
+  }
+  return true;
+}
