@@ -98,7 +98,8 @@ export default function ProfileScreen() {
   const { user, login, register, logout } = useAuth();
   const { favoriteBarcodes, toggleFavorite } = useFavorites();
   const { purchases } = useHistory();
-  const { pushEnabled, setPushEnabled } = useNotifications();
+  const { pushEnabled, setPushEnabled, preferences, updatePreference, pushError, busy } =
+    useNotifications();
   const { items } = useCart();
   const { offers } = usePromotions();
   const [registering, setRegistering] = useState(false),
@@ -121,13 +122,7 @@ export default function ProfileScreen() {
     const recentPurchases = purchases.slice(0, 2);
 
     const handleTogglePush = async (value: boolean) => {
-      const granted = await setPushEnabled(value);
-      if (value && !granted) {
-        Alert.alert(
-          'Push indisponível',
-          'Não foi possível ativar notificações push agora — pode ser permissão negada no celular, ou o app rodando no Expo Go (push exige um development build). O centro de notificações continua funcionando normalmente.',
-        );
-      }
+      await setPushEnabled(value);
     };
 
     return (
@@ -226,12 +221,47 @@ export default function ProfileScreen() {
             <Icon name="bell" size={19} color={colors.textMuted} />
             <Text style={styles.menuLabel}>Notificações</Text>
             <Switch
+              accessibilityLabel="Receber notificações neste celular"
+              disabled={busy}
               value={pushEnabled}
               onValueChange={handleTogglePush}
               trackColor={{ true: colors.brand, false: colors.border }}
               thumbColor="#fff"
             />
           </View>
+          <Text style={{ ...typography.caption, color: colors.textMuted, padding: spacing.md }}>
+            Ao ativar, pediremos permissão para avisar mesmo com o app fechado. Até um aviso por
+            dia, das 8h às 22h. Você pode desligar quando quiser.
+          </Text>
+          {pushError ? (
+            <Text style={{ color: colors.danger, padding: spacing.md }}>{pushError}</Text>
+          ) : null}
+          <View style={styles.menuRow}>
+            <Text style={styles.menuLabel}>Lembrar carrinho pendente</Text>
+            <Switch
+              accessibilityLabel="Lembrar carrinho pendente"
+              value={preferences.cartReminders}
+              disabled={!pushEnabled || busy}
+              onValueChange={(value) => void updatePreference('cartReminders', value)}
+              trackColor={{ true: colors.brand, false: colors.border }}
+              thumbColor="#fff"
+            />
+          </View>
+          <View style={styles.menuRow}>
+            <Text style={styles.menuLabel}>Ofertas dos produtos que compro</Text>
+            <Switch
+              accessibilityLabel="Ofertas dos produtos que compro"
+              value={preferences.personalizedOffers}
+              disabled={!pushEnabled || busy}
+              onValueChange={(value) => void updatePreference('personalizedOffers', value)}
+              trackColor={{ true: colors.brand, false: colors.border }}
+              thumbColor="#fff"
+            />
+          </View>
+          <Text style={{ ...typography.caption, color: colors.textMuted, padding: spacing.md }}>
+            Ofertas personalizadas usam as compras que você confirmar no app. Itens apenas
+            escaneados ou prévias salvas não contam como compras.
+          </Text>
           <View style={styles.menuDivider} />
           <MenuRow icon="briefcase" label="Área do lojista" onPress={() => router.push('/admin')} />
           <View style={styles.menuDivider} />

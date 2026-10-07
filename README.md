@@ -14,7 +14,7 @@ App mobile (Expo / React Native) para clientes de supermercado. O cliente **bipa
 - Câmera pausa automaticamente quando a aba não está em foco (bateria/privacidade).
 - Tela **Carrinho** com lista dos itens, favoritar, ajuste manual de quantidade, remoção e total com hierarquia visual forte.
 - Motor de promoções: `% OFF`, `leve X pague Y` e `preço fixo promocional` (gerais da loja), mais **ofertas exclusivas de cliente logado** que se ativam na aba Promoções e empilham sobre a promoção geral.
-- **Finalizar compra** de verdade: arquiva a compra no histórico e limpa o carrinho (não é só um alerta).
+- **Salvar prévia** arquiva a estimativa no histórico local; **Já comprei no caixa** registra uma compra declarada na API e limpa o carrinho. Nenhuma ação realiza pagamento ou concede pontos.
 
 **Em torno do Scan & Go:**
 - **Home**: saudação, CTA "Começar/Continuar comprando", resumo do carrinho atual, ofertas, listas e compras recentes.
@@ -56,7 +56,8 @@ A partir daí o scanner consulta o catálogo da franquia na API (`src/services/c
 ## O que ainda é local/demonstração
 
 - **Sem API configurada**: catálogo, ofertas e login de demonstração ficam em `src/data/`. Com API configurada, as ofertas e lojas vêm do PostgreSQL e as ativações do cliente são persistidas no servidor. A busca rápida da Home pesquisa os produtos das ofertas disponíveis.
-- **Listas, histórico, favoritos e orçamento**: só no aparelho (`AsyncStorage`). As tabelas `favorites`, `cart_sessions` e `cart_items` já existem para sincronizar.
+- **Listas, histórico visual, favoritos e orçamento**: ficam no aparelho (`AsyncStorage`). O carrinho e as compras declaradas também são enviados à API para as regras de notificações.
+- **Notificações remotas**: permissão solicitada quando o cliente ativa em Conta; lembretes de carrinho e ofertas de produtos frequentes com consentimento separado. Exigem credenciais FCM/APNs, build instalado e `PUSH_ENABLED=true` no servidor. Veja [ativação e regras](docs/NOTIFICATIONS.md).
 - **Cadastro do clube**: disponível na aba Conta, com nome, CPF válido e senha de pelo menos 8 caracteres. Em testes locais, `SEED_DEMO_CUSTOMER=true` cria o cliente de demonstração.
 
 ## Banco de dados (multi-tenant)
