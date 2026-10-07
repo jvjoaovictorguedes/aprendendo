@@ -1,9 +1,12 @@
 import { useIsFocused, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 
+import { StoreSelector } from '../../components/StoreSelector';
+import { OfferCard } from '../../components/OfferCard';
+import { cartItemKey } from '../../types';
 import { Button, Icon } from '../../components/ui';
 import { useBudget } from '../../context/BudgetContext';
 import { useCart } from '../../context/CartContext';
@@ -12,7 +15,7 @@ import { useNotifications } from '../../context/NotificationsContext';
 import { usePromotions } from '../../context/PromotionsContext';
 import { useTenantSettings } from '../../context/TenantSettingsContext';
 import { brand, colors, radius, spacing, typography } from '../../theme/tokens';
-import { computeCartTotals, formatBRL, formatKg } from '../../utils/pricing';
+import { computeCartTotals, computeCartLines, formatBRL, formatKg } from '../../utils/pricing';
 
 type Feedback =
   | { type: 'checking' }
@@ -25,6 +28,7 @@ type Feedback =
       fromList?: string;
       offline?: boolean;
     }
+  | { type: 'error'; message: string }
   | { type: 'not_found'; barcode: string; offline?: boolean };
 
 export default function ComprarScreen() {
@@ -32,7 +36,13 @@ export default function ComprarScreen() {
   const isFocused = useIsFocused();
   const [permission, requestPermission] = useCameraPermissions();
   const { items, addByBarcode, decrementItem } = useCart();
-  const { extraPercentOffFor } = usePromotions();
+  const { extraPercentOffFor, offersFor } = usePromotions();
+  const [lastKey, setLastKey] = useState<string | null>(null);
+  const lastItem = items.find((item) => cartItemKey(item) === lastKey);
+  const lastOffers = lastItem ? offersFor(lastItem.product.barcode) : [];
+  const lastTotal = lastItem
+    ? computeCartLines(items, extraPercentOffFor)[items.indexOf(lastItem)]
+    : null;
   const { markBoughtByBarcode, activeListId, lists } = useLists();
   const { limit } = useBudget();
   const { notify } = useNotifications();
@@ -80,6 +90,13 @@ export default function ComprarScreen() {
     }, scanCooldownMs);
   }, [scanCooldownMs]);
 
+  useEffect(
+    () => () => {
+      if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
+    },
+    [],
+  );
+
   const handleScanned = useCallback(
     async (result: BarcodeScanningResult) => {
       if (lockRef.current) return;
@@ -90,6 +107,7 @@ export default function ComprarScreen() {
 
       if (outcome.status === 'added') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        setLastKey(outcome.key);
         const listMatch = markBoughtByBarcode(outcome.product.barcode);
         setFeedback({
           type: 'added',
@@ -102,6 +120,8 @@ export default function ComprarScreen() {
           fromList: listMatch?.listName,
           offline: outcome.source === 'mock',
         });
+      } else if (outcome.status === 'error') {
+        setFeedback({ type: 'error', message: outcome.message });
       } else {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
         setFeedback({
@@ -147,6 +167,7 @@ export default function ComprarScreen() {
 
   return (
     <View style={styles.container}>
+      <StoreSelector />
       <View style={styles.cameraArea}>
         <CameraView
           style={StyleSheet.absoluteFill}
@@ -164,13 +185,19 @@ export default function ComprarScreen() {
 
       {activeList ? (
         <View style={styles.listBanner}>
-          <Text style={styles.listBannerText}>📋 Comprando a partir de &quot;{activeList.name}&quot;</Text>
+          <Text style={styles.listBannerText}>
+            📋 Comprando a partir de &quot;{activeList.name}&quot;
+          </Text>
         </View>
       ) : null}
 
       {feedback ? (
         <View
-          style={[styles.feedbackBanner, feedback.type === 'not_found' && styles.feedbackBannerError]}
+          style={[
+            styles.feedbackBanner,
+            (feedback.type === 'not_found' || feedback.type === 'error') &&
+              styles.feedbackBannerError,
+          ]}
         >
           {feedback.type === 'checking' ? (
             <Text style={styles.feedbackTitle}>Verificando produto…</Text>
@@ -191,8 +218,15 @@ export default function ComprarScreen() {
                 <Text style={styles.feedbackListMatch}>✓ Item da sua lista</Text>
               ) : null}
               {feedback.offline ? (
-                <Text style={styles.feedbackOffline}>⚠ Catálogo local (sem conexão com o servidor)</Text>
+                <Text style={styles.feedbackOffline}>
+                  ⚠ Catálogo local (sem conexão com o servidor)
+                </Text>
               ) : null}
+            </>
+          ) : feedback.type === 'error' ? (
+            <>
+              <Text style={styles.feedbackTitle}>Não foi possível consultar o preço</Text>
+              <Text style={styles.feedbackOffline}>{feedback.message} · Escaneie novamente.</Text>
             </>
           ) : (
             <>
@@ -211,6 +245,35 @@ export default function ComprarScreen() {
         </View>
       )}
 
+      {lastItem && lastTotal ? (
+        <ScrollView
+          style={{ maxHeight: 240, backgroundColor: colors.surface }}
+          contentContainerStyle={{ padding: spacing.md }}
+        >
+          <Text style={{ ...typography.bodyStrong, color: colors.text }}>
+            {lastItem.product.name} · {lastItem.quantity} item(ns)
+          </Text>
+          <Text style={{ color: colors.textMuted }}>
+            Normal: {formatBRL(lastTotal.originalTotal)} · Economia: {formatBRL(lastTotal.savings)}
+          </Text>
+          <Text style={{ ...typography.h2, color: colors.brandDark }}>
+            No carrinho: {formatBRL(lastTotal.finalTotal)}
+          </Text>
+          {lastOffers
+            .filter((o) => o.audience === 'club')
+            .map((o) => (
+              <OfferCard key={o.id} offer={o} />
+            ))}
+          {lastItem.product.promotion ? (
+            <Text style={{ ...typography.caption, color: colors.textMuted }}>
+              {lastItem.product.promotion.label} · {lastItem.product.promotion.conditions} ·{' '}
+              {lastItem.product.promotion.endsAt
+                ? `Até ${new Date(lastItem.product.promotion.endsAt).toLocaleString('pt-BR')}`
+                : 'Oferta sem data de encerramento'}
+            </Text>
+          ) : null}
+        </ScrollView>
+      ) : null}
       <TouchableOpacity style={styles.totalBar} onPress={() => router.push('/cart')}>
         <View>
           <Text style={styles.totalBarLabel}>{totals.itemCount} item(ns) escaneado(s)</Text>
@@ -252,7 +315,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     gap: spacing.sm,
   },
-  permissionTitle: { ...typography.h1, color: colors.text, marginTop: spacing.sm },
+  permissionTitle: {
+    ...typography.h1,
+    color: colors.text,
+    marginTop: spacing.sm,
+  },
   permissionText: {
     ...typography.body,
     color: colors.textMuted,
@@ -301,9 +368,23 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   feedbackPrice: { color: '#fff', ...typography.bodyStrong },
-  feedbackUndo: { color: '#fff', ...typography.caption, textDecorationLine: 'underline' },
-  feedbackListMatch: { color: '#fff', ...typography.small, marginTop: spacing.xs, fontWeight: '700' },
-  feedbackOffline: { color: '#fff', ...typography.small, marginTop: spacing.xs, opacity: 0.85 },
+  feedbackUndo: {
+    color: '#fff',
+    ...typography.caption,
+    textDecorationLine: 'underline',
+  },
+  feedbackListMatch: {
+    color: '#fff',
+    ...typography.small,
+    marginTop: spacing.xs,
+    fontWeight: '700',
+  },
+  feedbackOffline: {
+    color: '#fff',
+    ...typography.small,
+    marginTop: spacing.xs,
+    opacity: 0.85,
+  },
   totalBar: {
     backgroundColor: colors.surface,
     paddingVertical: spacing.lg,

@@ -83,6 +83,12 @@ export function toAdminProduct(row: ProductRow) {
 }
 
 export type PromotionRow = {
+  id?: string;
+  starts_at?: Date;
+  ends_at?: Date | null;
+  max_quantity?: number | null;
+  conditions?: string;
+  store_id?: string | null;
   kind: 'percent_off' | 'buy_x_pay_y' | 'fixed_price';
   label: string;
   percent: number | null;
@@ -92,13 +98,39 @@ export type PromotionRow = {
 };
 
 function toPromotion(row: PromotionRow) {
+  const details = row.id
+    ? {
+        id: row.id,
+        startsAt: row.starts_at?.toISOString(),
+        endsAt: row.ends_at?.toISOString() ?? null,
+        maxQuantity: row.max_quantity ?? null,
+        conditions: row.conditions ?? '',
+        storeId: row.store_id ?? null,
+      }
+    : {};
   switch (row.kind) {
     case 'percent_off':
-      return { kind: 'percentOff' as const, percent: row.percent ?? 0, label: row.label };
+      return {
+        kind: 'percentOff' as const,
+        percent: row.percent ?? 0,
+        label: row.label,
+        ...details,
+      };
     case 'buy_x_pay_y':
-      return { kind: 'buyXPayY' as const, buy: row.buy_qty ?? 1, pay: row.pay_qty ?? 1, label: row.label };
+      return {
+        kind: 'buyXPayY' as const,
+        buy: row.buy_qty ?? 1,
+        pay: row.pay_qty ?? 1,
+        label: row.label,
+        ...details,
+      };
     case 'fixed_price':
-      return { kind: 'fixedPrice' as const, price: row.fixed_price ?? 0, label: row.label };
+      return {
+        kind: 'fixedPrice' as const,
+        price: row.fixed_price ?? 0,
+        label: row.label,
+        ...details,
+      };
   }
 }
 

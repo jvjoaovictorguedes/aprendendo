@@ -8,6 +8,7 @@ import { registerErrorHandler } from './errors.js';
 import { adminTenantRoutes } from './routes/adminTenants.js';
 import { adminUserRoutes } from './routes/adminUsers.js';
 import { authRoutes } from './routes/auth.js';
+import { offerRoutes } from './routes/offers.js';
 import { publicRoutes } from './routes/public.js';
 
 export type Deps = {
@@ -25,7 +26,9 @@ export async function buildApp(
   const app = Fastify({ trustProxy: true, ...options });
   const deps: Deps = { db, config, limiter: new LoginRateLimiter() };
 
-  const origins = config.CORS_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean);
+  const origins = config.CORS_ORIGINS.split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
   await app.register(cors, {
     origin: origins.length > 0 ? origins : true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -40,10 +43,20 @@ export async function buildApp(
     return { ok: true };
   });
 
-  await app.register(async (scope) => publicRoutes(scope, deps), { prefix: '/public' });
-  await app.register(async (scope) => authRoutes(scope, deps), { prefix: '/auth' });
-  await app.register(async (scope) => adminTenantRoutes(scope, deps), { prefix: '/admin' });
-  await app.register(async (scope) => adminUserRoutes(scope, deps), { prefix: '/admin' });
+  await app.register(async (scope) => publicRoutes(scope, deps), {
+    prefix: '/public',
+  });
+  await app.register(async (scope) => authRoutes(scope, deps), {
+    prefix: '/auth',
+  });
+  await app.register(async (scope) => adminTenantRoutes(scope, deps), {
+    prefix: '/admin',
+  });
+  await app.register(async (scope) => adminUserRoutes(scope, deps), {
+    prefix: '/admin',
+  });
+
+  await app.register(async (scope) => offerRoutes(scope, deps));
 
   return app;
 }

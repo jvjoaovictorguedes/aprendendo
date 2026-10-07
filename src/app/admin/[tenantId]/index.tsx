@@ -2,7 +2,12 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { AdminPage, Loading, NavCard, StatusMessage } from '../../../components/admin/AdminUI';
-import { optionLabel, PLAN_OPTIONS, STATUS_OPTIONS, useTenant } from '../../../components/admin/tenantOptions';
+import {
+  optionLabel,
+  PLAN_OPTIONS,
+  STATUS_OPTIONS,
+  useTenant,
+} from '../../../components/admin/tenantOptions';
 import { Button } from '../../../components/ui';
 import { useAdminAuth } from '../../../context/AdminAuthContext';
 import { spacing } from '../../../theme/tokens';
@@ -18,7 +23,10 @@ export default function TenantHome() {
       | '/admin/[tenantId]/marca'
       | '/admin/[tenantId]/balanca'
       | '/admin/[tenantId]/regras'
-      | '/admin/[tenantId]/produtos',
+      | '/admin/[tenantId]/produtos'
+      | '/admin/[tenantId]/promocoes'
+      | '/admin/[tenantId]/lojas'
+      | '/admin/[tenantId]/fidelidade',
   ) => router.push({ pathname, params: { tenantId } });
 
   return (
@@ -38,6 +46,24 @@ export default function TenantHome() {
 
       {tenant ? (
         <View style={styles.grid}>
+          <NavCard
+            icon="percent"
+            title="Promoções e cupons"
+            description="Crie ofertas gerais e do clube, validade, limites e condições por loja."
+            onPress={() => go('/admin/[tenantId]/promocoes')}
+          />
+          <NavCard
+            icon="map-pin"
+            title="Lojas"
+            description="Cadastre as lojas participantes e seus horários."
+            onPress={() => go('/admin/[tenantId]/lojas')}
+          />
+          <NavCard
+            icon="star"
+            title="Fidelidade"
+            description="Configure benefícios por pontos e confirme resgates."
+            onPress={() => go('/admin/[tenantId]/fidelidade')}
+          />
           <NavCard
             icon="shopping-bag"
             title="Produtos"
@@ -71,7 +97,12 @@ export default function TenantHome() {
               icon="users"
               title="Usuários"
               description="Quem administra esta franquia no painel."
-              onPress={() => router.push({ pathname: '/admin/usuarios', params: { franquia: tenantId } })}
+              onPress={() =>
+                router.push({
+                  pathname: '/admin/usuarios',
+                  params: { franquia: tenantId },
+                })
+              }
             />
           ) : null}
         </View>

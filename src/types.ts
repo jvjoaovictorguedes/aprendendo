@@ -1,7 +1,18 @@
-export type Promotion =
-  | { kind: 'percentOff'; percent: number; label: string }
-  | { kind: 'buyXPayY'; buy: number; pay: number; label: string }
-  | { kind: 'fixedPrice'; price: number; label: string };
+export type PromotionDetails = {
+  id?: string;
+  startsAt?: string;
+  endsAt?: string | null;
+  maxQuantity?: number | null;
+  conditions?: string;
+  storeId?: string | null;
+};
+
+export type Promotion = PromotionDetails &
+  (
+    | { kind: 'percentOff'; percent: number; label: string }
+    | { kind: 'buyXPayY'; buy: number; pay: number; label: string }
+    | { kind: 'fixedPrice'; price: number; label: string }
+  );
 
 export type Product = {
   /** Produtos vendidos só por peso (sem EAN próprio) usam "plu:<PLU>". */

@@ -50,7 +50,13 @@ describe('app do cliente (público)', () => {
     const product = await api.request('GET', '/public/products/barcode/7891000200104', { tenant: PILOT });
     assert.equal(product.status, 200);
     assert.equal(product.body.name, 'Leite Integral 1L');
-    assert.deepEqual(product.body.promotion, { kind: 'buyXPayY', buy: 3, pay: 2, label: 'Leve 3 Pague 2' });
+    assert.equal(product.body.promotion.kind, 'buyXPayY');
+    assert.equal(product.body.promotion.buy, 3);
+    assert.equal(product.body.promotion.pay, 2);
+    assert.equal(product.body.promotion.label, 'Leve 3 Pague 2');
+    assert.equal(product.body.promotion.maxQuantity, null);
+    assert.ok(product.body.promotion.id);
+    assert.ok(product.body.promotion.startsAt);
   });
 
   it('produto pelo PLU da balança (zeros à esquerda não importam)', async () => {

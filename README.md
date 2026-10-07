@@ -8,7 +8,7 @@ App mobile (Expo / React Native) para clientes de supermercado. O cliente **bipa
 
 **Scan & Go (núcleo do app):**
 - Leitura de código de barras (EAN-13, EAN-8, UPC-A, UPC-E, Code128) pela câmera, usando `expo-camera`, com feedback imediato (nome, preço, **desfazer**) e háptico a cada bipagem.
-- Busca de produto **real na API** quando configurada (ver seção abaixo), com fallback automático pro catálogo local se a API não estiver configurada ou a chamada falhar — o scanner nunca trava esperando resposta.
+- Busca de produto **real na API** quando configurada (ver seção abaixo), com catálogo local apenas quando a API não estiver configurada. Falhas de conexão mostram erro e permitem tentar novamente, sem inventar preços.
 - Cada bipagem soma automaticamente ao carrinho (produto repetido = quantidade +1).
 - **Etiqueta de balança** (hortifrúti, açougue, frios): o cliente pesa o produto, a balança imprime um EAN-13 de peso variável com o PLU e o preço (ou peso) embutidos, e o app lê o valor direto do código. Cada produto é cadastrado **uma vez só** (PLU + preço do kg) — qualquer peso funciona. O formato da etiqueta é configurável por franquia (ver "Painel admin").
 - Câmera pausa automaticamente quando a aba não está em foco (bateria/privacidade).
@@ -55,10 +55,9 @@ A partir daí o scanner consulta o catálogo da franquia na API (`src/services/c
 
 ## O que ainda é local/demonstração
 
-- **Ofertas exclusivas de cliente**: `src/data/memberPromotions.ts` — a tabela `member_promotions` já existe na API; falta a rota e ligar o `PromotionsContext`.
-- **Ofertas da Home e busca rápida**: usam `src/data/products.ts`.
+- **Sem API configurada**: catálogo, ofertas e login de demonstração ficam em `src/data/`. Com API configurada, as ofertas e lojas vêm do PostgreSQL e as ativações do cliente são persistidas no servidor. A busca rápida da Home pesquisa os produtos das ofertas disponíveis.
 - **Listas, histórico, favoritos e orçamento**: só no aparelho (`AsyncStorage`). As tabelas `favorites`, `cart_sessions` e `cart_items` já existem para sincronizar.
-- **Cadastro do cliente pelo app**: ainda não existe — hoje o cliente entra com CPF + senha já cadastrados (em teste, `SEED_DEMO_CUSTOMER=true` na API cria CPF 12345678900 / senha 123456).
+- **Cadastro do clube**: disponível na aba Conta, com nome, CPF válido e senha de pelo menos 8 caracteres. Em testes locais, `SEED_DEMO_CUSTOMER=true` cria o cliente de demonstração.
 
 ## Banco de dados (multi-tenant)
 
@@ -72,8 +71,8 @@ Papéis (`users.role`): **`platform_admin`** (equipe ScanMercado — todas as fr
 | `tenant_settings` | Parametrizações da franquia: layout da etiqueta de balança, aviso de orçamento, intervalo entre bipagens |
 | `users` / `sessions` | Login próprio (senha em bcrypt) e sessões revogáveis |
 | `products` | Catálogo por franquia, com EAN e/ou **PLU da balança** |
-| `promotions` | Promoções da loja (% off, leve/pague, preço fixo) |
-| `member_promotions` / `member_promotion_activations` | Ofertas exclusivas de cliente logado |
+| `promotions` / `promotion_activations` | Ofertas gerais e do clube, lojas, validade, condições e ativações persistidas |
+| `loyalty_settings`, `loyalty_credits`, `loyalty_redemptions` | Programa de pontos, créditos por comprovante e benefícios emitidos/entregues |
 | `favorites`, `cart_sessions`, `cart_items`, `notifications` | Prontas para sincronizar o que hoje fica no aparelho |
 | `stores`, `catalog_imports` | Lojas físicas e auditoria de importação de catálogo |
 
@@ -86,6 +85,9 @@ Fica no próprio app, em `/admin` — no celular pela aba **Conta → Área do l
 | Plataforma | Início da equipe ScanMercado: Franquias e Usuários. `tenant_admin` cai direto na própria franquia. |
 | Franquias | Lista e cria franquias (já nascem com a configuração padrão). |
 | Usuários | Só a plataforma cria acessos: e-mail, nome, papel e franquia. A conta nasce com **senha temporária gerada no servidor**, mostrada uma vez. Também redefine senha e bloqueia/desbloqueia (vale na hora). |
+| Promoções e cupons | Criar, editar, agendar e pausar ofertas; selecionar produto, público, loja, validade, limite e condições. |
+| Lojas | Nome, endereço, horários e disponibilidade das lojas participantes. |
+| Fidelidade | Definir recompensa, pontos necessários e conversão por real; creditar compras confirmadas e registrar entrega de benefícios. |
 | Produtos | Catálogo: nome, categoria, preço (ou preço do kg), EAN, **PLU da balança**, ativo/inativo. |
 | Balança | Formato da etiqueta: prefixo, dígitos do PLU, se o código traz **preço total ou peso**, dígitos/casas do valor, dígito verificador. Modelos prontos, desenho do layout e **simulador**. |
 | Regras do app | % do orçamento para avisar o cliente e intervalo entre bipagens. |
@@ -172,9 +174,13 @@ npx expo run:android --variant release
 ```bash
 npm run typecheck   # TypeScript
 npm run lint        # ESLint
+npm run test:pricing # Cálculos; instalar as dependências de api/ primeiro
+npm --prefix api test # Integração com PostgreSQL em memória
 ```
 
-Ambos passam limpos nesta versão. Também validei que o bundle JS compila corretamente para Android via `npx expo export -p android`.
+TypeScript, lint, testes da API e dos cálculos verificam o fluxo. Gere o bundle Android com `npx expo export -p android`. O lint pode mostrar um aviso no arquivo de rotas gerado pelo Expo; não é um erro do aplicativo.
+
+O fluxo do lojista, regras de promoção e roteiro de validação estão em [docs/PROMOTIONS.md](docs/PROMOTIONS.md).
 
 ## Fluxo de branches
 
@@ -192,8 +198,7 @@ Quando a `dev` estiver estável (typecheck e lint passando, fluxo testado no cel
 
 ## Próximos passos sugeridos
 
-- Ligar ofertas de cliente (`memberPromotions.ts`) e cadastro de cliente na API.
 - Sincronizar `cart_sessions`/`cart_items` com o backend (histórico de compras, cruzar com o caixa). Hoje **listas, histórico, favoritos e orçamento vivem só no `AsyncStorage` do aparelho** — não sincronizam entre dispositivos nem sobrevivem a reinstalar o app. Se precisar disso, essas 4 entidades também viram tabelas (`shopping_lists`, `shopping_list_items`, `favorites`, `user_budget`) ligadas a `users.id`.
 - Imagens de produto: o catálogo mock não tem URLs de imagem, então o carrinho hoje não mostra foto do produto (a UI já está pronta para receber `product.imageUrl` quando o catálogo real tiver isso).
-- Adicionar suite de testes automatizados (Jest + React Native Testing Library) — hoje a validação é manual (typecheck, lint, `expo export` e teste do fluxo no dispositivo).
+- Expandir testes de interface no dispositivo; API, permissões, pontos e cálculos já têm testes automatizados.
 - Ícone e splash screen com a marca do supermercado (hoje usa o placeholder padrão do Expo).
