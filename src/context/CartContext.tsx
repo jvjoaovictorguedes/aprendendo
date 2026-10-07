@@ -12,6 +12,7 @@ import {
 
 import { fetchProductByBarcode, fetchProductByPlu, CatalogSource } from '../services/catalog';
 import { CartItem, cartItemKey, Product, WeighedInfo } from '../types';
+import { roundCents } from '../utils/pricing';
 import { readScannerLabel, resolveScaleLabel } from '../utils/scaleLabel';
 
 import { useStore } from './StoreContext';
@@ -58,7 +59,8 @@ export function CartProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
       .then((raw) => {
-        if (raw) setItems(JSON.parse(raw));
+        const saved = raw ? JSON.parse(raw) : null;
+        if (Array.isArray(saved)) setItems(saved);
       })
       .catch(() => {})
       .finally(() => setIsLoaded(true));
@@ -129,10 +131,18 @@ export function CartProvider({ children }: PropsWithChildren) {
     [scale, storeId, addLine],
   );
 
+  // Lê os itens por ref: atualizar preços não deve disparar a cada bipagem,
+  // só ao abrir o app, trocar de loja, voltar para a tela ou no intervalo.
+  const itemsRef = useRef(items);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
   const requests = useRef(0);
-  const itemCodes = items.map((i) => `${i.product.barcode}:${i.product.plu ?? ''}`).join('|');
   const refreshPrices = useCallback(async () => {
-    if (!isApiConfigured || !itemCodes) {
+    const codes = Array.from(
+      new Set(itemsRef.current.map((i) => `${i.product.barcode}\n${i.product.plu ?? ''}`)),
+    );
+    if (!isApiConfigured || codes.length === 0) {
       setPriceError(null);
       setRefreshing(false);
       return;
@@ -141,11 +151,10 @@ export function CartProvider({ children }: PropsWithChildren) {
     setRefreshing(true);
     try {
       const prices = await Promise.all(
-        itemCodes.split('|').map(async (code) => {
-          const [barcode, ...rest] = code.split(':');
-          const plu = rest[0];
+        codes.map(async (code) => {
+          const [barcode, plu] = code.split('\n');
           const result =
-            barcode === 'plu'
+            barcode.startsWith('plu:') && plu
               ? await fetchProductByPlu(plu, storeId)
               : await fetchProductByBarcode(barcode, storeId);
           if (!result.product)
@@ -155,10 +164,22 @@ export function CartProvider({ children }: PropsWithChildren) {
       );
       if (request !== requests.current) return;
       setItems((current) =>
-        current.map((item) => ({
-          ...item,
-          product: prices.find((p) => p.barcode === item.product.barcode) ?? item.product,
-        })),
+        current.map((item) => {
+          const product = prices.find((p) => p.barcode === item.product.barcode);
+          if (!product) return item;
+          // Etiqueta com peso: o total depende do preço do kg, então acompanha o preço novo.
+          // Etiqueta com preço: o total impresso vale; só o peso estimado é recalculado.
+          const weighed =
+            item.weighed && product.price > 0
+              ? item.weighed.weightIsEstimated
+                ? { ...item.weighed, weightKg: item.weighed.labelTotal / product.price }
+                : {
+                    ...item.weighed,
+                    labelTotal: roundCents(item.weighed.weightKg * product.price),
+                  }
+              : item.weighed;
+          return { ...item, product, weighed };
+        }),
       );
       setPriceError(null);
     } catch (e) {
@@ -167,16 +188,16 @@ export function CartProvider({ children }: PropsWithChildren) {
     } finally {
       if (request === requests.current) setRefreshing(false);
     }
-  }, [storeId, itemCodes]);
+  }, [storeId]);
   useEffect(() => {
+    if (!isLoaded) return;
     const guard = requests;
-    guard.current++;
     const timer = setTimeout(() => void refreshPrices(), 0);
     return () => {
       clearTimeout(timer);
       guard.current++;
     };
-  }, [refreshPrices]);
+  }, [refreshPrices, isLoaded]);
 
   const incrementItem = useCallback((key: string) => {
     setItems((current) =>

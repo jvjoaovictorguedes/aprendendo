@@ -38,9 +38,8 @@ export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerStyle: { backgroundColor: colors.brand },
-        headerTintColor: '#fff',
-        headerTitleStyle: { fontWeight: '700' },
+        // Cada tela desenha o próprio cabeçalho (ScreenHeader), no mesmo padrão.
+        headerShown: false,
         tabBarActiveTintColor: colors.brand,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarLabelPosition: 'below-icon',
@@ -65,7 +64,6 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Início',
-          headerShown: false,
           tabBarIcon: ({ color }) => <Icon name="home" size={22} color={color} />,
         }}
       />
@@ -73,7 +71,6 @@ export default function TabsLayout() {
         name="promotions"
         options={{
           title: 'Ofertas',
-          headerShown: false,
           tabBarIcon: ({ color }) => <Icon name="percent" size={21} color={color} />,
         }}
       />
@@ -81,7 +78,6 @@ export default function TabsLayout() {
         name="comprar"
         options={{
           title: 'Comprar',
-          headerShown: false,
           tabBarAccessibilityLabel: 'Escanear produtos',
           tabBarIcon: () => <ScanTabIcon />,
         }}
@@ -89,7 +85,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="listas"
         options={{
-          title: 'Minhas Listas',
+          title: 'Listas',
           tabBarLabel: ({ color }) => <TabLabel label="Listas" color={color} />,
           tabBarIcon: ({ color }) => <Icon name="list" size={21} color={color} />,
         }}
@@ -98,14 +94,13 @@ export default function TabsLayout() {
         name="profile"
         options={{
           title: 'Conta',
-          headerShown: false,
           tabBarIcon: ({ color }) => <Icon name="user" size={22} color={color} />,
         }}
       />
       {/* Rotas acessíveis por navegação, mas fora da barra de abas */}
-      <Tabs.Screen name="cart" options={{ title: 'Meu Carrinho', href: null }} />
+      <Tabs.Screen name="cart" options={{ title: 'Carrinho', href: null }} />
       <Tabs.Screen name="historico" options={{ title: 'Histórico', href: null }} />
-      <Tabs.Screen name="lojas" options={{ title: 'Lojas próximas', href: null }} />
+      <Tabs.Screen name="lojas" options={{ title: 'Lojas', href: null }} />
       <Tabs.Screen name="notifications" options={{ title: 'Notificações', href: null }} />
     </Tabs>
   );

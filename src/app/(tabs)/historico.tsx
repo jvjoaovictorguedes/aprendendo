@@ -1,13 +1,23 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 
-import { Badge, Button, Card, EmptyState } from '../../components/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  ListRow,
+  Notice,
+  Screen,
+  ScreenHeader,
+} from '../../components/ui';
 import { useCart } from '../../context/CartContext';
 import { useHistory } from '../../context/HistoryContext';
 import { CartItem, cartItemKey, Purchase } from '../../types';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { formatBRL, formatKg } from '../../utils/pricing';
+import { showMessage } from '../../utils/dialogs';
 
 function itemDescription(item: CartItem): string {
   if (item.weighed) {
@@ -35,130 +45,104 @@ export default function HistoryScreen() {
     const skipped = purchase.items.length - repeatable.length;
     for (const item of repeatable) {
       for (let i = 0; i < item.quantity; i += 1) {
-         
         await addByBarcode(item.product.barcode);
       }
     }
     setIsBuyingAgain(false);
-    Alert.alert(
+    showMessage(
       'Itens adicionados',
-      `${repeatable.length} produto(s) dessa compra foram adicionados ao seu carrinho atual, com os preços de hoje.` +
+      `${repeatable.length} produto(s) dessa compra foram para o carrinho, com os preços de hoje.` +
         (skipped > 0
-          ? ` ${skipped} item(ns) pesado(s) na balança ficaram de fora — pese de novo na loja.`
+          ? ` ${skipped} item(ns) da balança ficaram de fora — pese de novo na loja.`
           : ''),
-      [{ text: 'Ver carrinho', onPress: () => router.push('/cart') }],
+      () => router.push('/cart'),
     );
   };
 
-  if (purchases.length === 0) {
-    return (
-      <View style={styles.container}>
-        <EmptyState
-          emoji="🧾"
-          title="Nenhuma compra finalizada ainda"
-          subtitle="Suas compras aparecem aqui depois que você finaliza no carrinho."
-        />
-      </View>
-    );
-  }
-
   if (selected) {
+    const weighedCount = selected.items.filter((item) => item.weighed).length;
     return (
-      <View style={styles.container}>
-        <View style={styles.detailHeader}>
-          <TouchableOpacity onPress={() => setSelected(null)} hitSlop={8}>
-            <Text style={styles.backLink}>‹ Histórico</Text>
-          </TouchableOpacity>
-          <Text style={styles.detailDate}>
-            {new Date(selected.date).toLocaleDateString('pt-BR', {
+      <Screen
+        header={
+          <ScreenHeader
+            title={new Date(selected.date).toLocaleDateString('pt-BR', {
               day: '2-digit',
               month: 'long',
               year: 'numeric',
             })}
-          </Text>
-          <Text style={styles.detailTotal}>{formatBRL(selected.finalTotal)}</Text>
-          {selected.savings > 0 ? (
-            <Badge label={`Economizou ${formatBRL(selected.savings)}`} variant="brand" />
-          ) : null}
-        </View>
-
-        <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm }}>
-          {selected.items.map((item) => (
-            <Card key={cartItemKey(item)} style={styles.itemRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.itemName}>{item.product.name}</Text>
-                <Text style={styles.itemQty}>{itemDescription(item)}</Text>
-              </View>
-              <Text style={styles.itemSubtotal}>{formatBRL(itemSubtotal(item))}</Text>
-            </Card>
-          ))}
-        </ScrollView>
-
-        <View style={styles.footer}>
+            subtitle={`${selected.items.length} produto(s)`}
+            onBack={() => setSelected(null)}
+          />
+        }
+        footer={
           <Button
             label="Comprar novamente"
             onPress={() => handleBuyAgain(selected)}
             loading={isBuyingAgain}
             fullWidth
           />
-        </View>
-      </View>
+        }
+      >
+        <Card style={styles.summary}>
+          <Text style={styles.summaryLabel}>Total da compra</Text>
+          <Text style={styles.summaryTotal}>{formatBRL(selected.finalTotal)}</Text>
+          {selected.savings > 0 ? (
+            <Badge label={`Economizou ${formatBRL(selected.savings)}`} variant="brand" />
+          ) : null}
+        </Card>
+        {weighedCount > 0 ? (
+          <Notice message="Itens da balança não entram no “Comprar novamente”: pese de novo na loja." />
+        ) : null}
+        <Card padded={false}>
+          {selected.items.map((item, index) => (
+            <ListRow
+              key={cartItemKey(item)}
+              title={item.product.name}
+              subtitle={itemDescription(item)}
+              divider={index > 0}
+              right={<Text style={styles.itemSubtotal}>{formatBRL(itemSubtotal(item))}</Text>}
+            />
+          ))}
+        </Card>
+      </Screen>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm }}>
-        {purchases.map((purchase) => (
-          <TouchableOpacity key={purchase.id} onPress={() => setSelected(purchase)}>
-            <Card style={styles.purchaseRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.purchaseDate}>
-                  {new Date(purchase.date).toLocaleDateString('pt-BR')}
-                </Text>
-                <Text style={styles.purchaseItems}>{purchase.items.length} produto(s)</Text>
-              </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                <Text style={styles.purchaseTotal}>{formatBRL(purchase.finalTotal)}</Text>
-                {purchase.savings > 0 ? (
-                  <Text style={styles.purchaseSavings}>
-                    economizou {formatBRL(purchase.savings)}
-                  </Text>
-                ) : null}
-              </View>
-            </Card>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-    </View>
+    <Screen header={<ScreenHeader title="Histórico" subtitle="Suas compras salvas." back />}>
+      {purchases.length === 0 ? (
+        <EmptyState
+          emoji="🧾"
+          title="Nenhuma compra salva ainda"
+          subtitle="Ao terminar uma compra no carrinho, ela aparece aqui."
+          actionLabel="Começar compra"
+          onAction={() => router.push('/comprar')}
+        />
+      ) : (
+        <Card padded={false}>
+          {purchases.map((purchase, index) => (
+            <ListRow
+              key={purchase.id}
+              icon="shopping-bag"
+              title={new Date(purchase.date).toLocaleDateString('pt-BR')}
+              subtitle={
+                `${purchase.items.length} produto(s)` +
+                (purchase.savings > 0 ? ` · economizou ${formatBRL(purchase.savings)}` : '')
+              }
+              divider={index > 0}
+              onPress={() => setSelected(purchase)}
+              right={<Text style={styles.itemSubtotal}>{formatBRL(purchase.finalTotal)}</Text>}
+            />
+          ))}
+        </Card>
+      )}
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surfaceAlt },
-  purchaseRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  purchaseDate: { ...typography.bodyStrong, color: colors.text },
-  purchaseItems: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
-  purchaseTotal: { ...typography.h2, color: colors.text },
-  purchaseSavings: { ...typography.small, color: colors.brandDark, marginTop: 2 },
-  detailHeader: {
-    padding: spacing.lg,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    gap: spacing.xs,
-  },
-  backLink: { ...typography.bodyStrong, color: colors.brand },
-  detailDate: { ...typography.h2, color: colors.text, marginTop: spacing.sm },
-  detailTotal: { ...typography.display, color: colors.text },
-  itemRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  itemName: { ...typography.bodyStrong, color: colors.text },
-  itemQty: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+  summary: { gap: spacing.xs },
+  summaryLabel: { ...typography.caption, color: colors.textMuted },
+  summaryTotal: { ...typography.display, color: colors.text },
   itemSubtotal: { ...typography.bodyStrong, color: colors.text },
-  footer: {
-    padding: spacing.lg,
-    backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
 });

@@ -27,8 +27,10 @@ export function FavoritesProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
       .then((raw) => {
-        if (raw) setFavoriteBarcodes(JSON.parse(raw));
+        const saved = raw ? JSON.parse(raw) : null;
+        if (Array.isArray(saved)) setFavoriteBarcodes(saved);
       })
+      .catch(() => {})
       .finally(() => setIsLoaded(true));
   }, []);
 

@@ -137,3 +137,11 @@ export function formatBRL(value: number): string {
     currency: 'BRL',
   });
 }
+
+/** "1.234,56", "8,99" ou "8.99" → número; NaN se inválido. */
+export function parseDecimal(value: string): number {
+  const trimmed = value.trim();
+  if (trimmed === '') return NaN;
+  const normalized = trimmed.includes(',') ? trimmed.replace(/\./g, '').replace(',', '.') : trimmed;
+  return Number(normalized);
+}

@@ -136,6 +136,9 @@ describe('gestão de usuários', () => {
     lojistaToken = await api.login('lojista@mercado.com', created.body.temporaryPassword);
     const me = await api.request('GET', '/auth/me', { token: lojistaToken });
     assert.equal(me.body.mustChangePassword, true);
+    // Com a senha temporária, o painel fica bloqueado até a troca.
+    const blocked = await api.request('GET', '/admin/tenants', { token: lojistaToken });
+    assert.equal(blocked.status, 403);
   });
 
   it('e-mail repetido é recusado', async () => {
@@ -350,5 +353,25 @@ describe('franquias (plataforma)', () => {
     });
     assert.equal(response.body.plan, 'enterprise');
     assert.equal(response.body.status, 'suspensa');
+
+    // Franquia suspensa não aceita cadastro nem login de cliente no app.
+    const register = await api.request('POST', '/auth/customer/register', {
+      tenant: OTHER_TENANT,
+      body: { name: 'Cliente', cpf: '52998224725', password: 'senha-segura' },
+    });
+    assert.equal(register.status, 403);
+    const login = await api.request('POST', '/auth/customer/login', {
+      tenant: OTHER_TENANT,
+      body: { cpf: '52998224725', password: 'senha-segura' },
+    });
+    assert.equal(login.status, 403);
+  });
+
+  it('logo da franquia só aceita endereço http(s)', async () => {
+    const response = await api.request('PATCH', `/admin/tenants/${PILOT}`, {
+      token: adminToken,
+      body: { logoUrl: 'javascript:alert(1)' },
+    });
+    assert.equal(response.status, 400);
   });
 });
