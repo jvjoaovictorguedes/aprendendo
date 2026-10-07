@@ -1,3 +1,4 @@
+import { loadNotificationPolicy } from './notificationPolicy.js';
 import type { Config } from './config.js';
 import type { Db } from './db/pool.js';
 import { transaction } from './db/pool.js';
@@ -54,7 +55,7 @@ export function expoTransport(accessToken?: string): PushTransport {
   };
 }
 
-export function isNotificationHour(now: Date, timezone: string) {
+export function isNotificationHour(now: Date, timezone: string, startHour = 8, endHour = 22) {
   const hour = Number(
     new Intl.DateTimeFormat('en-US', {
       timeZone: timezone,
@@ -62,7 +63,9 @@ export function isNotificationHour(now: Date, timezone: string) {
       hourCycle: 'h23',
     }).format(now),
   );
-  return hour >= 8 && hour < 22;
+  return startHour < endHour
+    ? hour >= startHour && hour < endHour
+    : hour >= startHour || hour < endHour;
 }
 
 type Offer = {
@@ -124,6 +127,7 @@ export async function runEngagement(
   transport: PushTransport = expoTransport(config.EXPO_ACCESS_TOKEN),
   at?: Date,
 ) {
+  const policy = await loadNotificationPolicy(db, config);
   const clock = () => at ?? new Date();
   let now = clock();
   // Recibos também são consultados fora do horário de avisos.
@@ -170,7 +174,11 @@ export async function runEngagement(
         ]);
     }
   }
-  if (!isNotificationHour(now, config.PUSH_TIMEZONE)) return;
+  if (
+    !policy.enabled ||
+    !isNotificationHour(now, policy.timezone, policy.startHour, policy.endHour)
+  )
+    return;
 
   await transaction(db, async (client) => {
     // Impede que duas réplicas criem avisos diferentes para o mesmo cliente no mesmo dia.
@@ -186,9 +194,9 @@ export async function runEngagement(
       where u.disabled_at is null and u.role='customer' and not t.is_demo and t.status<>'suspensa' and (pref.cart_reminders or pref.personalized_offers)
       and exists(select 1 from push_devices d join sessions s on s.id=d.session_id where d.user_id=u.id
         and d.active and s.revoked_at is null and s.expires_at>$1)
-      and not exists(select 1 from customer_notifications n where n.user_id=u.id and n.created_at>$1::timestamptz-interval '24 hours')
+      and not exists(select 1 from customer_notifications n where n.user_id=u.id and n.created_at>$1::timestamptz-($2::int * interval '1 minute'))
       order by pref.last_evaluated_at,pref.user_id limit 200`,
-      [now],
+      [now, policy.minimumIntervalMinutes],
     );
     for (const user of users) {
       await client.query(
@@ -210,7 +218,7 @@ export async function runEngagement(
         user.cart_reminders &&
         cart?.status === 'active' &&
         cart.items.length &&
-        cart.last_activity_at.getTime() <= now.getTime() - config.CART_REMINDER_MINUTES * 60000 &&
+        cart.last_activity_at.getTime() <= now.getTime() - policy.cartReminderMinutes * 60000 &&
         cart.last_activity_at.getTime() > now.getTime() - 24 * 3600000
       ) {
         const duplicate = (
@@ -229,7 +237,7 @@ export async function runEngagement(
             dedupe: `cart:${cart.cart_key}`,
             title: 'Seu carrinho ficou salvo',
             body: offer
-              ? `Quer continuar sua compra? ${offerText(offer, config.PUSH_TIMEZONE)}`
+              ? `Quer continuar sua compra? ${offerText(offer, policy.timezone)}`
               : 'Continue de onde parou e confira os itens do seu carrinho. Se já comprou no caixa, marque a compra como concluída no app.',
             offer,
             cartKey: cart.cart_key,
@@ -240,9 +248,9 @@ export async function runEngagement(
         const frequent = await client.query<{ product_id: string }>(
           `select i.product_id from customer_purchase_items i
           join customer_purchases p on p.id=i.purchase_id where p.user_id=$1 and p.tenant_id=$2
-          and p.purchased_at>$3::timestamptz-interval '90 days'
-          group by i.product_id having count(distinct p.id)>=3`,
-          [user.user_id, user.tenant_id, now],
+          and p.purchased_at>$3::timestamptz-($4::int * interval '1 day')
+          group by i.product_id having count(distinct p.id)>=$5`,
+          [user.user_id, user.tenant_id, now, policy.purchaseWindowDays, policy.minimumPurchases],
         );
         const offers = await eligibleOffers(client, user.tenant_id, cart?.store_id ?? null, now);
         for (const offer of offers.filter((o) =>
@@ -259,7 +267,7 @@ export async function runEngagement(
             kind: 'offer',
             dedupe: `offer:${offer.id}`,
             title: 'Um produto que você compra está em oferta',
-            body: offerText(offer, config.PUSH_TIMEZONE),
+            body: offerText(offer, policy.timezone),
             offer,
             cartKey: null,
           };
@@ -300,7 +308,7 @@ export async function runEngagement(
   );
   for (let index = 0; index < 100; index++) {
     now = clock();
-    if (!isNotificationHour(now, config.PUSH_TIMEZONE)) break;
+    if (!isNotificationHour(now, policy.timezone, policy.startHour, policy.endHour)) break;
     const claim = await db.query<{
       id: string;
       notification_id: string;
@@ -356,13 +364,12 @@ export async function runEngagement(
     if (validOffer) {
       data.body =
         (data.kind === 'cart' ? 'Quer continuar sua compra? ' : '') +
-        offerText(validOffer, config.PUSH_TIMEZONE);
+        offerText(validOffer, policy.timezone);
       await db.query('update customer_notifications set body=$2 where id=$1', [data.id, data.body]);
     }
     if (
       data.kind === 'cart' &&
-      new Date(data.last_activity_at).getTime() >
-        now.getTime() - config.CART_REMINDER_MINUTES * 60000
+      new Date(data.last_activity_at).getTime() > now.getTime() - policy.cartReminderMinutes * 60000
     ) {
       await db.query(
         "update push_deliveries set status='pending',attempts=attempts-1,next_attempt_at=$2 where id=$1",
@@ -372,7 +379,7 @@ export async function runEngagement(
     }
     try {
       now = clock();
-      if (!isNotificationHour(now, config.PUSH_TIMEZONE)) {
+      if (!isNotificationHour(now, policy.timezone, policy.startHour, policy.endHour)) {
         await db.query(
           "update push_deliveries set status='pending',attempts=attempts-1,next_attempt_at=$2 where id=$1",
           [delivery.id, new Date(now.getTime() + 60000)],

@@ -13,7 +13,9 @@ export default function PlatformHome() {
 
   // Admin de franquia vai direto para a própria franquia.
   if (!isPlatformAdmin && profile?.tenantId) {
-    return <Redirect href={{ pathname: '/admin/[tenantId]', params: { tenantId: profile.tenantId } }} />;
+    return (
+      <Redirect href={{ pathname: '/admin/[tenantId]', params: { tenantId: profile.tenantId } }} />
+    );
   }
 
   return (
@@ -25,6 +27,12 @@ export default function PlatformHome() {
       actions={<Button label="Sair" variant="ghost" onPress={signOut} />}
     >
       <View style={styles.grid}>
+        <NavCard
+          icon="bell"
+          title="Notificações"
+          description="Horários, intervalo do carrinho e regras de recorrência. Exclusivo da plataforma."
+          onPress={() => router.push('/admin/notificacoes')}
+        />
         <NavCard
           icon="briefcase"
           title="Franquias"
