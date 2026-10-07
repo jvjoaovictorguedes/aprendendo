@@ -110,8 +110,13 @@ export async function authRoutes(app: FastifyInstance, { db, config, limiter }: 
         password,
       })
       .parse(request.body);
-    if (!(await db.query('select id from tenants where id=$1', [tenantId])).rows[0])
-      throw badRequest('Franquia não encontrada.');
+    const tenant = (await db.query('select id,is_demo from tenants where id=$1', [tenantId]))
+      .rows[0];
+    if (!tenant) throw badRequest('Franquia não encontrada.');
+    if (tenant.is_demo)
+      throw badRequest(
+        'Use a conta fictícia da apresentação. Não cadastre dados pessoais nesta loja.',
+      );
     const user = (
       await db.query<{ id: string }>(
         `insert into users (tenant_id,role,name,cpf,password_hash) values ($1,'customer',$2,$3,$4) returning id`,

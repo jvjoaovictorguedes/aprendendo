@@ -1,3 +1,4 @@
+import { useDemo } from '../../context/DemoContext';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -96,6 +97,7 @@ function MenuRow({
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, login, register, logout } = useAuth();
+  const demo = useDemo();
   const { favoriteBarcodes, toggleFavorite } = useFavorites();
   const { purchases } = useHistory();
   const { pushEnabled, setPushEnabled, preferences, updatePreference, pushError, busy } =
@@ -229,7 +231,13 @@ export default function ProfileScreen() {
               thumbColor="#fff"
             />
           </View>
-          <Text style={{ ...typography.caption, color: colors.textMuted, padding: spacing.md }}>
+          <Text
+            style={{
+              ...typography.caption,
+              color: colors.textMuted,
+              padding: spacing.md,
+            }}
+          >
             Ao ativar, pediremos permissão para avisar mesmo com o app fechado. Até um aviso por
             dia, das 8h às 22h. Você pode desligar quando quiser.
           </Text>
@@ -258,7 +266,13 @@ export default function ProfileScreen() {
               thumbColor="#fff"
             />
           </View>
-          <Text style={{ ...typography.caption, color: colors.textMuted, padding: spacing.md }}>
+          <Text
+            style={{
+              ...typography.caption,
+              color: colors.textMuted,
+              padding: spacing.md,
+            }}
+          >
             Ofertas personalizadas usam as compras que você confirmar no app. Itens apenas
             escaneados ou prévias salvas não contam como compras.
           </Text>
@@ -362,7 +376,13 @@ export default function ProfileScreen() {
           style={{ marginTop: spacing.xl }}
         />
 
-        {isApiConfigured ? (
+        {demo.enabled ? (
+          <Button
+            label="Usar conta fictícia da apresentação"
+            variant="ghost"
+            onPress={() => router.push('/demonstracao')}
+          />
+        ) : isApiConfigured ? (
           <Button
             label={registering ? 'Já tenho conta' : 'Criar conta do clube'}
             variant="ghost"

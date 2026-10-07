@@ -1,3 +1,5 @@
+import { DemoProvider } from '../context/DemoContext';
+import { DemoBanner } from '../components/DemoBanner';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -21,26 +23,30 @@ export default function Layout() {
         <TenantSettingsProvider>
           <StoreProvider>
             <AuthProvider>
-              <CartProvider>
-                <PromotionsProvider>
-                  <ListsProvider>
-                    <HistoryProvider>
-                      <BudgetProvider>
-                        <FavoritesProvider>
-                          <NotificationsProvider>
-                            <StatusBar style="light" />
-                            <Stack screenOptions={{ headerShown: false }}>
-                              <Stack.Screen name="(tabs)" />
-                              {/* Painel do lojista / plataforma — mobile e web */}
-                              <Stack.Screen name="admin" />
-                            </Stack>
-                          </NotificationsProvider>
-                        </FavoritesProvider>
-                      </BudgetProvider>
-                    </HistoryProvider>
-                  </ListsProvider>
-                </PromotionsProvider>
-              </CartProvider>
+              <DemoProvider>
+                <CartProvider>
+                  <PromotionsProvider>
+                    <ListsProvider>
+                      <HistoryProvider>
+                        <BudgetProvider>
+                          <FavoritesProvider>
+                            <NotificationsProvider>
+                              <StatusBar style="light" />
+                              <DemoBanner />
+                              <Stack screenOptions={{ headerShown: false }}>
+                                <Stack.Screen name="(tabs)" />
+                                <Stack.Screen name="demonstracao" />
+                                {/* Painel do lojista / plataforma — mobile e web */}
+                                <Stack.Screen name="admin" />
+                              </Stack>
+                            </NotificationsProvider>
+                          </FavoritesProvider>
+                        </BudgetProvider>
+                      </HistoryProvider>
+                    </ListsProvider>
+                  </PromotionsProvider>
+                </CartProvider>
+              </DemoProvider>
             </AuthProvider>
           </StoreProvider>
         </TenantSettingsProvider>

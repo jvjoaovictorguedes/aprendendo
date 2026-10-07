@@ -1,10 +1,15 @@
+import { demoStorageKey } from './demo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { apiRequest, isApiConfigured } from './api';
 
-export type AppBrand = { name: string; accentColor: string; logoUrl: string | null };
+export type AppBrand = {
+  name: string;
+  accentColor: string;
+  logoUrl: string | null;
+};
 
-const STORAGE_KEY = 'scanmercado:brand:v1';
+const STORAGE_KEY = demoStorageKey('scanmercado:brand:v1');
 // Primeira abertura (sem cache): espera a marca no máximo isso antes de abrir
 // com a marca padrão — o app nunca fica preso numa tela vazia.
 const FIRST_LOAD_TIMEOUT_MS = 2500;
@@ -41,6 +46,8 @@ export async function loadBrand(): Promise<AppBrand | null> {
   const refresh = refreshCache();
   if (cached) return cached;
 
-  const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), FIRST_LOAD_TIMEOUT_MS));
+  const timeout = new Promise<null>((resolve) =>
+    setTimeout(() => resolve(null), FIRST_LOAD_TIMEOUT_MS),
+  );
   return Promise.race([refresh, timeout]);
 }

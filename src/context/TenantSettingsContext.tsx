@@ -1,5 +1,13 @@
+import { demoStorageKey } from '../services/demo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createContext, PropsWithChildren, useContext, useEffect, useState } from 'react';
+import {
+  createContext,
+  PropsWithChildren,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+} from 'react';
 
 import { isApiConfigured } from '../services/api';
 import {
@@ -8,7 +16,9 @@ import {
   TenantSettings,
 } from '../services/tenantSettings';
 
-const STORAGE_KEY = 'scanmercado:tenant-settings:v1';
+const STORAGE_KEY = demoStorageKey('scanmercado:tenant-settings:v1');
+
+const RefreshContext = createContext<() => Promise<void>>(async () => {});
 
 const TenantSettingsContext = createContext<TenantSettings>(DEFAULT_TENANT_SETTINGS);
 
@@ -19,6 +29,13 @@ const TenantSettingsContext = createContext<TenantSettings>(DEFAULT_TENANT_SETTI
  */
 export function TenantSettingsProvider({ children }: PropsWithChildren) {
   const [settings, setSettings] = useState<TenantSettings>(DEFAULT_TENANT_SETTINGS);
+
+  const refresh = useCallback(async () => {
+    if (!isApiConfigured) return;
+    const remote = await fetchAppTenantSettings();
+    setSettings(remote);
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(remote));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -44,9 +61,15 @@ export function TenantSettingsProvider({ children }: PropsWithChildren) {
     };
   }, []);
 
-  return <TenantSettingsContext.Provider value={settings}>{children}</TenantSettingsContext.Provider>;
+  return (
+    <RefreshContext.Provider value={refresh}>
+      <TenantSettingsContext.Provider value={settings}>{children}</TenantSettingsContext.Provider>
+    </RefreshContext.Provider>
+  );
 }
 
 export function useTenantSettings(): TenantSettings {
   return useContext(TenantSettingsContext);
 }
+
+export const useRefreshTenantSettings = () => useContext(RefreshContext);

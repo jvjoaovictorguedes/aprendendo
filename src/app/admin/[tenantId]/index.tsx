@@ -1,3 +1,4 @@
+import { DemoPanel } from '../../../components/admin/DemoPanel';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
@@ -16,7 +17,7 @@ export default function TenantHome() {
   const router = useRouter();
   const { tenantId } = useLocalSearchParams<{ tenantId: string }>();
   const { isPlatformAdmin, signOut } = useAdminAuth();
-  const { tenant, error } = useTenant(tenantId);
+  const { tenant, error, reload } = useTenant(tenantId);
 
   const go = (
     pathname:
@@ -44,6 +45,7 @@ export default function TenantHome() {
       <StatusMessage status={error ? { kind: 'error', message: error } : null} />
       {!tenant && !error ? <Loading /> : null}
 
+      {tenant ? <DemoPanel tenantId={tenantId} onReset={reload} /> : null}
       {tenant ? (
         <View style={styles.grid}>
           <NavCard

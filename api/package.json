@@ -14,7 +14,9 @@
     "start": "node dist/server.js",
     "migrate": "tsx --env-file-if-exists=.env src/scripts/migrate.ts",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test test/*.test.ts"
+    "test": "tsx --test test/*.test.ts",
+    "demo:seed": "tsx --env-file-if-exists=.env src/scripts/demo.ts",
+    "demo:labels": "tsx src/scripts/demoLabels.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",

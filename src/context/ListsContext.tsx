@@ -1,3 +1,4 @@
+import { demoStorageKey } from '../services/demo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   createContext,
@@ -11,8 +12,8 @@ import {
 
 import { ShoppingList } from '../types';
 
-const STORAGE_KEY = 'scanmercado:lists:v1';
-const ACTIVE_KEY = 'scanmercado:active-list:v1';
+const STORAGE_KEY = demoStorageKey('scanmercado:lists:v1');
+const ACTIVE_KEY = demoStorageKey('scanmercado:active-list:v1');
 
 type ListsContextValue = {
   lists: ShoppingList[];
@@ -82,7 +83,12 @@ export function ListsProvider({ children }: PropsWithChildren) {
               ...list,
               items: [
                 ...list.items,
-                { id: `i_${Date.now()}`, name: name.trim(), barcode, bought: false },
+                {
+                  id: `i_${Date.now()}`,
+                  name: name.trim(),
+                  barcode,
+                  bought: false,
+                },
               ],
             }
           : list,
@@ -153,7 +159,17 @@ export function ListsProvider({ children }: PropsWithChildren) {
       setActiveListId,
       markBoughtByBarcode,
     }),
-    [lists, activeListId, createList, removeList, addItem, removeItem, toggleBought, setActiveListId, markBoughtByBarcode],
+    [
+      lists,
+      activeListId,
+      createList,
+      removeList,
+      addItem,
+      removeItem,
+      toggleBought,
+      setActiveListId,
+      markBoughtByBarcode,
+    ],
   );
 
   return <ListsContext.Provider value={value}>{children}</ListsContext.Provider>;
