@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -21,7 +22,10 @@ type Value = {
   offers: Offer[];
   activatedIds: string[];
   loading: boolean;
+  /** Falha ao carregar ofertas/ativações (cupons ficam fora do total). */
   error: string | null;
+  /** Falha ao ativar/desativar uma oferta — não afeta os cupons já ativos. */
+  actionError: { offerId: string; message: string } | null;
   pendingId: string | null;
   isActivated: (id: string) => boolean;
   toggleActivation: (id: string) => Promise<void>;
@@ -93,6 +97,7 @@ export function PromotionsProvider({ children }: PropsWithChildren) {
   const [activatedIds, setIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<Value['actionError']>(null);
   const [pendingId, setPending] = useState<string | null>(null);
   const busy = useRef(false);
   const version = useRef(0);
@@ -155,12 +160,16 @@ export function PromotionsProvider({ children }: PropsWithChildren) {
       sub.remove();
     };
   }, [refresh, refreshPrices]);
-  const offers = rawOffers.filter(
-    (o) =>
-      o.active &&
-      Date.parse(o.startsAt) <= now &&
-      (!o.endsAt || Date.parse(o.endsAt) > now) &&
-      (!o.storeId || o.storeId === storeId),
+  const offers = useMemo(
+    () =>
+      rawOffers.filter(
+        (o) =>
+          o.active &&
+          Date.parse(o.startsAt) <= now &&
+          (!o.endsAt || Date.parse(o.endsAt) > now) &&
+          (!o.storeId || o.storeId === storeId),
+      ),
+    [rawOffers, now, storeId],
   );
   const toggleActivation = useCallback(
     async (id: string) => {
@@ -169,7 +178,7 @@ export function PromotionsProvider({ children }: PropsWithChildren) {
       if (!offer) return;
       busy.current = true;
       setPending(id);
-      setError(null);
+      setActionError(null);
       const active = activatedIds.includes(id),
         v = version.current;
       try {
@@ -183,7 +192,10 @@ export function PromotionsProvider({ children }: PropsWithChildren) {
         } else await AsyncStorage.setItem(key, JSON.stringify(next));
         if (v === version.current) setIds(next);
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Não foi possível ativar a oferta.');
+        setActionError({
+          offerId: id,
+          message: e instanceof Error ? e.message : 'Não foi possível ativar a oferta.',
+        });
       } finally {
         busy.current = false;
         setPending(null);
@@ -191,47 +203,68 @@ export function PromotionsProvider({ children }: PropsWithChildren) {
     },
     [user, token, offers, activatedIds, key],
   );
-  const offersFor = (barcode: string) => offers.filter((o) => o.product.barcode === barcode);
-  const extraPercentOffFor = (barcode: string) => {
-    if (!user || error) return 0;
-    const quantity = items
-      .filter((i) => i.product.barcode === barcode)
-      .reduce((sum, i) => sum + (i.weighed ? i.weighed.weightKg : 1) * i.quantity, 0);
-    return offersFor(barcode)
-      .filter(
-        (o) =>
-          o.audience === 'club' &&
-          activatedIds.includes(o.id) &&
-          (!o.endsAt || Date.parse(o.endsAt) > Date.now()),
-      )
-      .reduce(
-        (max, o) =>
-          Math.max(
-            max,
-            (o.percent ?? 0) *
-              (o.maxQuantity && quantity ? Math.min(1, o.maxQuantity / quantity) : 1),
-          ),
-        0,
-      );
-  };
-  return (
-    <Context.Provider
-      value={{
-        offers,
-        activatedIds,
-        loading,
-        error,
-        pendingId,
-        isActivated: (id) => !!user && activatedIds.includes(id),
-        toggleActivation,
-        extraPercentOffFor,
-        offersFor,
-        refresh,
-      }}
-    >
-      {children}
-    </Context.Provider>
+  const offersFor = useCallback(
+    (barcode: string) => offers.filter((o) => o.product.barcode === barcode),
+    [offers],
   );
+  const extraPercentOffFor = useCallback(
+    (barcode: string) => {
+      if (!user || error) return 0;
+      const quantity = items
+        .filter((i) => i.product.barcode === barcode)
+        .reduce((sum, i) => sum + (i.weighed ? i.weighed.weightKg : 1) * i.quantity, 0);
+      return offersFor(barcode)
+        .filter(
+          (o) =>
+            o.audience === 'club' &&
+            activatedIds.includes(o.id) &&
+            (!o.endsAt || Date.parse(o.endsAt) > Date.now()),
+        )
+        .reduce(
+          (max, o) =>
+            Math.max(
+              max,
+              (o.percent ?? 0) *
+                (o.maxQuantity && quantity ? Math.min(1, o.maxQuantity / quantity) : 1),
+            ),
+          0,
+        );
+    },
+    [user, error, items, offersFor, activatedIds],
+  );
+  const isActivated = useCallback(
+    (id: string) => !!user && activatedIds.includes(id),
+    [user, activatedIds],
+  );
+  const value = useMemo<Value>(
+    () => ({
+      offers,
+      activatedIds,
+      loading,
+      error,
+      actionError,
+      pendingId,
+      isActivated,
+      toggleActivation,
+      extraPercentOffFor,
+      offersFor,
+      refresh,
+    }),
+    [
+      offers,
+      activatedIds,
+      loading,
+      error,
+      actionError,
+      pendingId,
+      isActivated,
+      toggleActivation,
+      extraPercentOffFor,
+      offersFor,
+      refresh,
+    ],
+  );
+  return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 export function usePromotions() {
   const c = useContext(Context);

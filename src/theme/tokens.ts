@@ -30,6 +30,8 @@ export const colors = {
   starGold: '#FFD166',
 
   overlay: 'rgba(10, 12, 14, 0.55)',
+  /** Fundo translúcido sobre superfícies escuras (cartão do clube, câmera). */
+  onDarkSoft: 'rgba(255, 255, 255, 0.16)',
 };
 
 /** Nome e logo da franquia deste app (padrão: ScanMercado). */

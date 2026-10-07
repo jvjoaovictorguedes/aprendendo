@@ -27,8 +27,10 @@ export function HistoryProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
       .then((raw) => {
-        if (raw) setPurchases(JSON.parse(raw));
+        const saved = raw ? JSON.parse(raw) : null;
+        if (Array.isArray(saved)) setPurchases(saved);
       })
+      .catch(() => {})
       .finally(() => setIsLoaded(true));
   }, []);
 

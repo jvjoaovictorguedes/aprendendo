@@ -1,17 +1,19 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import {
-  Image,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { Badge, Button, Card, Icon, Section } from '../../components/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  HeaderIconButton,
+  Icon,
+  Notice,
+  Screen,
+  SearchField,
+  Section,
+} from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { useHistory } from '../../context/HistoryContext';
@@ -24,6 +26,12 @@ import { offerPromotion } from '../../utils/offers';
 import { MOCK_PRODUCTS } from '../../data/products';
 import { brand, colors, radius, spacing, typography } from '../../theme/tokens';
 import { computeCartTotals, computeLineTotal, formatBRL } from '../../utils/pricing';
+
+const QUICK_ACTIONS = [
+  { label: 'Cupons', icon: 'tag', href: '/promotions' },
+  { label: 'Histórico', icon: 'clock', href: '/historico' },
+  { label: 'Lojas', icon: 'map-pin', href: '/lojas' },
+] as const;
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -77,7 +85,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
+    <Screen contentStyle={styles.content}>
       <View style={styles.header}>
         {brand.logoUrl ? (
           <Image
@@ -91,37 +99,24 @@ export default function HomeScreen() {
             {getGreeting()}
             {user ? `, ${user.name.split(' ')[0]}` : ''}
           </Text>
-          <View style={styles.storeRow}>
-            <Icon name="map-pin" size={13} color={colors.textMuted} />
-            <Text style={styles.store}>{brand.name}</Text>
-          </View>
+          <Text style={styles.store}>{brand.name}</Text>
         </View>
-        <TouchableOpacity
+        <HeaderIconButton
+          icon="bell"
+          label="Notificações"
           onPress={() => router.push('/notifications')}
-          accessibilityRole="button"
-          accessibilityLabel="Notificações"
-          style={styles.bellButton}
-        >
-          <Icon name="bell" size={19} color={colors.text} />
-          {unreadCount > 0 ? <View style={styles.bellBadge} /> : null}
-        </TouchableOpacity>
+          badge={unreadCount > 0}
+        />
       </View>
 
-      <StoreSelector />
-      {addError ? (
-        <Text style={{ color: colors.danger, padding: spacing.md }}>{addError}</Text>
-      ) : null}
-      <View style={styles.sectionPadding}>
-        <View style={styles.searchBar}>
-          <Icon name="search" size={17} color={colors.textFaint} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Buscar ofertas por produto…"
-            placeholderTextColor={colors.textFaint}
-            value={query}
-            onChangeText={setQuery}
-          />
-        </View>
+      <View style={[styles.sectionPadding, styles.stack]}>
+        <StoreSelector />
+        <SearchField
+          placeholder="Buscar ofertas por produto…"
+          value={query}
+          onChangeText={setQuery}
+        />
+        {addError ? <Notice tone="error" message={addError} /> : null}
         {searchMatches.length > 0 ? (
           <Card style={styles.searchResults}>
             {searchMatches.map((product) => (
@@ -185,24 +180,20 @@ export default function HomeScreen() {
       ) : null}
 
       <View style={[styles.sectionPadding, styles.quickActions]}>
-        <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/promotions')}>
-          <View style={styles.quickActionIcon}>
-            <Icon name="tag" size={21} color={colors.brand} />
-          </View>
-          <Text style={styles.quickActionLabel}>Cupons</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/profile')}>
-          <View style={styles.quickActionIcon}>
-            <Icon name="heart" size={21} color={colors.textMuted} />
-          </View>
-          <Text style={styles.quickActionLabel}>Favoritos</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/lojas')}>
-          <View style={styles.quickActionIcon}>
-            <Icon name="map-pin" size={21} color={colors.textMuted} />
-          </View>
-          <Text style={styles.quickActionLabel}>Lojas</Text>
-        </TouchableOpacity>
+        {QUICK_ACTIONS.map((action) => (
+          <TouchableOpacity
+            key={action.label}
+            style={styles.quickAction}
+            onPress={() => router.push(action.href)}
+            accessibilityRole="button"
+            accessibilityLabel={action.label}
+          >
+            <View style={styles.quickActionIcon}>
+              <Icon name={action.icon} size={21} color={colors.brandDark} />
+            </View>
+            <Text style={styles.quickActionLabel}>{action.label}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       <Section
@@ -332,73 +323,31 @@ export default function HomeScreen() {
           )}
         </View>
       </Section>
-    </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surfaceAlt },
+  content: { paddingHorizontal: 0, gap: 0 },
   header: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
     gap: spacing.sm,
   },
   logo: {
     width: 44,
     height: 44,
     borderRadius: radius.md,
-    marginRight: spacing.md,
+    marginRight: spacing.xs,
   },
   greeting: { ...typography.h1, color: colors.text },
-  storeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 4,
-  },
-  store: { ...typography.caption, color: colors.textMuted },
-  bellButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bellBadge: {
-    position: 'absolute',
-    top: 2,
-    right: 4,
-    width: 9,
-    height: 9,
-    borderRadius: 5,
-    backgroundColor: colors.danger,
-    borderWidth: 2,
-    borderColor: colors.surface,
-  },
+  store: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
   sectionPadding: { paddingHorizontal: spacing.lg },
-  searchBar: {
-    marginTop: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.lg,
-  },
-  searchInput: {
-    flex: 1,
-    paddingVertical: spacing.md,
-    ...typography.body,
-    color: colors.text,
-  },
-  searchResults: { marginTop: spacing.sm, padding: spacing.sm },
+  stack: { gap: spacing.md },
+  searchResults: { padding: spacing.sm },
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -411,7 +360,7 @@ const styles = StyleSheet.create({
   searchAddButton: {
     width: 32,
     height: 32,
-    borderRadius: 16,
+    borderRadius: radius.lg,
     backgroundColor: colors.brand,
     alignItems: 'center',
     justifyContent: 'center',
@@ -429,8 +378,8 @@ const styles = StyleSheet.create({
   ctaIconWrap: {
     width: 48,
     height: 48,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: radius.lg,
+    backgroundColor: colors.onDarkSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -451,7 +400,7 @@ const styles = StyleSheet.create({
   quickActionIcon: {
     width: '100%',
     height: 58,
-    borderRadius: 18,
+    borderRadius: radius.lg,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -497,7 +446,7 @@ const styles = StyleSheet.create({
   couponIconWrap: {
     width: 44,
     height: 44,
-    borderRadius: 14,
+    borderRadius: radius.md,
     backgroundColor: colors.brandSoft,
     alignItems: 'center',
     justifyContent: 'center',

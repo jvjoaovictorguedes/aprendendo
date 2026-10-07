@@ -29,19 +29,23 @@ type ListsContextValue = {
 
 const ListsContext = createContext<ListsContextValue | undefined>(undefined);
 
+// Date.now() sozinho repete quando dois itens entram no mesmo milissegundo.
+const newId = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
 export function ListsProvider({ children }: PropsWithChildren) {
   const [lists, setLists] = useState<ShoppingList[]>([]);
   const [activeListId, setActiveListIdState] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    Promise.all([AsyncStorage.getItem(STORAGE_KEY), AsyncStorage.getItem(ACTIVE_KEY)]).then(
-      ([rawLists, rawActive]) => {
-        if (rawLists) setLists(JSON.parse(rawLists));
+    Promise.all([AsyncStorage.getItem(STORAGE_KEY), AsyncStorage.getItem(ACTIVE_KEY)])
+      .then(([rawLists, rawActive]) => {
+        const savedLists = rawLists ? JSON.parse(rawLists) : null;
+        if (Array.isArray(savedLists)) setLists(savedLists);
         if (rawActive) setActiveListIdState(JSON.parse(rawActive));
-        setIsLoaded(true);
-      },
-    );
+      })
+      .catch(() => {})
+      .finally(() => setIsLoaded(true));
   }, []);
 
   useEffect(() => {
@@ -56,7 +60,7 @@ export function ListsProvider({ children }: PropsWithChildren) {
 
   const createList = useCallback((name: string) => {
     const list: ShoppingList = {
-      id: `l_${Date.now()}`,
+      id: newId('l'),
       name: name.trim() || 'Lista sem nome',
       createdAt: new Date().toISOString(),
       items: [],
@@ -82,7 +86,7 @@ export function ListsProvider({ children }: PropsWithChildren) {
               ...list,
               items: [
                 ...list.items,
-                { id: `i_${Date.now()}`, name: name.trim(), barcode, bought: false },
+                { id: newId('i'), name: name.trim(), barcode, bought: false },
               ],
             }
           : list,

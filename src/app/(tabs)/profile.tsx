@@ -1,19 +1,18 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ReactNode, useState } from 'react';
+import { KeyboardAvoidingView, Platform, StyleSheet, Switch, Text, View } from 'react-native';
 
-import { Button, Card, Icon } from '../../components/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  Icon,
+  ListRow,
+  Notice,
+  Screen,
+  ScreenHeader,
+  TextField,
+} from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { useBudget } from '../../context/BudgetContext';
 import { useFavorites } from '../../context/FavoritesContext';
@@ -26,70 +25,69 @@ import { findProductByBarcode } from '../../data/products';
 import { brand, colors, radius, spacing, typography } from '../../theme/tokens';
 import { LoyaltyCard } from '../../components/LoyaltyCard';
 import { getTierProgress } from '../../utils/loyalty';
-import { formatBRL } from '../../utils/pricing';
+import { formatBRL, parseDecimal } from '../../utils/pricing';
+import { showMessage } from '../../utils/dialogs';
 
 function formatCpfInput(value: string): string {
   return value.replace(/\D/g, '').slice(0, 11);
 }
 
+function SectionTitle({ title, action }: { title: string; action?: ReactNode }) {
+  return (
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {action}
+    </View>
+  );
+}
+
 function BudgetSection() {
   const { limit, setLimit } = useBudget();
-  const [draft, setDraft] = useState(limit != null ? String(limit) : '');
+  const [draft, setDraft] = useState(limit != null ? limit.toFixed(2).replace('.', ',') : '');
+  const [error, setError] = useState<string | null>(null);
 
   const handleSave = () => {
-    const parsed = Number(draft.replace(',', '.'));
     if (draft.trim() === '') {
       setLimit(null);
+      setError(null);
       return;
     }
+    const parsed = parseDecimal(draft);
     if (Number.isNaN(parsed) || parsed <= 0) {
-      Alert.alert('Valor inválido', 'Digite um valor válido para o orçamento.');
+      setError('Digite um valor maior que zero, por exemplo 250,00.');
       return;
     }
+    setError(null);
     setLimit(parsed);
   };
 
   return (
-    <Card style={{ marginTop: spacing.lg }}>
-      <Text style={styles.sectionTitle}>Orçamento da compra</Text>
-      <Text style={styles.sectionSubtitle}>
-        Defina um limite e acompanhe quanto resta enquanto bipa os produtos.
-      </Text>
-      <View style={styles.budgetRow}>
-        <Text style={styles.budgetPrefix}>R$</Text>
-        <TextInput
-          style={styles.budgetInput}
+    <Card style={styles.stack}>
+      <View>
+        <Text style={styles.cardTitle}>Orçamento da compra</Text>
+        <Text style={styles.cardSubtitle}>
+          Defina um limite e veja quanto resta enquanto bipa os produtos.
+        </Text>
+      </View>
+      <View style={styles.inlineForm}>
+        <TextField
+          prefix="R$"
           placeholder="0,00"
           keyboardType="decimal-pad"
           value={draft}
           onChangeText={setDraft}
+          onSubmitEditing={handleSave}
+          accessibilityLabel="Limite do orçamento"
         />
         <Button label="Salvar" onPress={handleSave} />
       </View>
+      {error ? <Notice tone="error" message={error} /> : null}
       {limit != null ? (
-        <Text style={styles.budgetCurrent}>Limite atual: {formatBRL(limit)}</Text>
+        <Text style={styles.budgetCurrent}>
+          Limite atual: {formatBRL(limit)} · deixe em branco para remover
+        </Text>
       ) : null}
     </Card>
-  );
-}
-
-function MenuRow({
-  icon,
-  label,
-  onPress,
-  danger,
-}: {
-  icon: Parameters<typeof Icon>[0]['name'];
-  label: string;
-  onPress: () => void;
-  danger?: boolean;
-}) {
-  return (
-    <TouchableOpacity style={styles.menuRow} onPress={onPress}>
-      <Icon name={icon} size={19} color={danger ? colors.danger : colors.textMuted} />
-      <Text style={[styles.menuLabel, danger && { color: colors.danger }]}>{label}</Text>
-      {!danger ? <Icon name="chevron-right" size={17} color={colors.textFaint} /> : null}
-    </TouchableOpacity>
   );
 }
 
@@ -102,9 +100,9 @@ export default function ProfileScreen() {
     useNotifications();
   const { items } = useCart();
   const { offers } = usePromotions();
-  const [registering, setRegistering] = useState(false),
-    [name, setName] = useState(''),
-    [loginError, setLoginError] = useState<string | null>(null);
+  const [registering, setRegistering] = useState(false);
+  const [name, setName] = useState('');
+  const [loginError, setLoginError] = useState<string | null>(null);
   const [cpf, setCpf] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -119,174 +117,176 @@ export default function ProfileScreen() {
           : findProductByBarcode(barcode),
       )
       .filter((product): product is NonNullable<typeof product> => Boolean(product));
-    const recentPurchases = purchases.slice(0, 2);
-
-    const handleTogglePush = async (value: boolean) => {
-      await setPushEnabled(value);
-    };
+    const recentPurchases = purchases.slice(0, 3);
 
     return (
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={{
-          padding: spacing.lg,
-          paddingBottom: spacing.xxl,
-        }}
-      >
-        <View style={styles.loggedHeader}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{user.name.charAt(0)}</Text>
-          </View>
-          <Text style={styles.name}>{user.name}</Text>
-          <Text style={styles.cpf}>CPF: {user.cpf}</Text>
-        </View>
-
-        <View style={styles.loyaltyCard}>
-          <View style={styles.loyaltyTop}>
-            <View>
-              <Text style={styles.loyaltyCardLabel}>Cartão {brand.name}</Text>
-              <Text style={styles.loyaltyCardName}>{user.name}</Text>
+      <Screen header={<ScreenHeader title="Conta" />}>
+        <View style={styles.memberCard}>
+          <View style={styles.memberTop}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{user.name.charAt(0).toUpperCase()}</Text>
+            </View>
+            <View style={styles.flex}>
+              <Text style={styles.memberName}>{user.name}</Text>
+              <Text style={styles.memberMeta}>CPF {user.cpf}</Text>
             </View>
             <View style={styles.tierBadge}>
               <Text style={styles.tierBadgeText}>Nível {tierProgress.tier}</Text>
             </View>
           </View>
-          <View style={styles.loyaltyBottom}>
-            <View>
-              <Text style={styles.loyaltyCardLabel}>Pontos de fidelidade</Text>
-              <Text style={styles.loyaltyPointsValue}>{user.points} pts</Text>
-            </View>
-            <Icon name="credit-card" size={26} color="rgba(255,255,255,0.5)" />
+          <View style={styles.memberBottom}>
+            <Text style={styles.memberMeta}>Cartão {brand.name}</Text>
+            <Icon name="credit-card" size={22} color={colors.textFaint} />
           </View>
         </View>
 
         <LoyaltyCard />
-        <Card style={{ marginTop: spacing.lg }}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Favoritos</Text>
+
+        <Card padded={false}>
+          <View style={styles.cardHeaderPad}>
+            <SectionTitle title="Favoritos" />
           </View>
           {favoriteProducts.length === 0 ? (
-            <Text style={styles.emptyHint}>
+            <Text style={[styles.emptyHint, styles.cardBodyPad]}>
               Toque no coração de um produto no carrinho para favoritá-lo.
             </Text>
           ) : (
             favoriteProducts.map((product) => (
-              <View key={product.barcode} style={styles.favoriteRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.favoriteName}>{product.name}</Text>
-                  <Text style={styles.favoritePrice}>{formatBRL(product.price)}</Text>
-                </View>
-                <TouchableOpacity onPress={() => toggleFavorite(product.barcode)} hitSlop={8}>
-                  <Icon name="heart" size={18} color={colors.danger} />
-                </TouchableOpacity>
-              </View>
+              <ListRow
+                key={product.barcode}
+                title={product.name}
+                subtitle={formatBRL(product.price)}
+                divider
+                right={
+                  <Button
+                    label="Remover"
+                    variant="ghost"
+                    onPress={() => toggleFavorite(product.barcode)}
+                  />
+                }
+              />
             ))
           )}
         </Card>
 
-        <Card style={{ marginTop: spacing.lg }}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Compras recentes</Text>
-            <TouchableOpacity onPress={() => router.push('/historico')}>
-              <Text style={styles.sectionAction}>Ver tudo</Text>
-            </TouchableOpacity>
+        <Card padded={false}>
+          <View style={styles.cardHeaderPad}>
+            <SectionTitle
+              title="Compras recentes"
+              action={
+                <Button label="Ver tudo" variant="ghost" onPress={() => router.push('/historico')} />
+              }
+            />
           </View>
           {recentPurchases.length === 0 ? (
-            <Text style={styles.emptyHint}>Suas compras finalizadas aparecem aqui.</Text>
+            <Text style={[styles.emptyHint, styles.cardBodyPad]}>
+              Suas compras salvas aparecem aqui.
+            </Text>
           ) : (
             recentPurchases.map((purchase) => (
-              <TouchableOpacity
+              <ListRow
                 key={purchase.id}
-                style={styles.purchaseRow}
+                icon="shopping-bag"
+                title={new Date(purchase.date).toLocaleDateString('pt-BR')}
+                subtitle={`${purchase.items.length} produto(s)`}
+                divider
                 onPress={() => router.push('/historico')}
-              >
-                <View>
-                  <Text style={styles.favoriteName}>
-                    {new Date(purchase.date).toLocaleDateString('pt-BR')}
-                  </Text>
-                  <Text style={styles.favoritePrice}>{purchase.items.length} produto(s)</Text>
-                </View>
-                <Text style={styles.purchaseTotal}>{formatBRL(purchase.finalTotal)}</Text>
-              </TouchableOpacity>
+                right={<Text style={styles.amount}>{formatBRL(purchase.finalTotal)}</Text>}
+              />
             ))
           )}
         </Card>
 
         <BudgetSection />
 
-        <Card style={{ marginTop: spacing.lg, padding: 0 }}>
-          <MenuRow icon="map-pin" label="Lojas próximas" onPress={() => router.push('/lojas')} />
-          <View style={styles.menuDivider} />
-          <View style={styles.menuRow}>
-            <Icon name="bell" size={19} color={colors.textMuted} />
-            <Text style={styles.menuLabel}>Notificações</Text>
-            <Switch
-              accessibilityLabel="Receber notificações neste celular"
-              disabled={busy}
-              value={pushEnabled}
-              onValueChange={handleTogglePush}
-              trackColor={{ true: colors.brand, false: colors.border }}
-              thumbColor="#fff"
-            />
+        <Card padded={false}>
+          <View style={styles.cardHeaderPad}>
+            <SectionTitle title="Notificações" />
           </View>
-          <Text style={{ ...typography.caption, color: colors.textMuted, padding: spacing.md }}>
-            Ao ativar, pediremos permissão para avisar mesmo com o app fechado. Até um aviso por
-            dia, das 8h às 22h. Você pode desligar quando quiser.
-          </Text>
+          <ListRow
+            icon="bell"
+            title="Receber neste celular"
+            subtitle="Até um aviso por dia, das 8h às 22h."
+            divider
+            right={
+              <Switch
+                accessibilityLabel="Receber notificações neste celular"
+                disabled={busy}
+                value={pushEnabled}
+                onValueChange={(value) => void setPushEnabled(value)}
+                trackColor={{ true: colors.brand, false: colors.border }}
+                thumbColor={colors.surface}
+              />
+            }
+          />
+          <ListRow
+            title="Lembrar carrinho pendente"
+            divider
+            right={
+              <Switch
+                accessibilityLabel="Lembrar carrinho pendente"
+                value={preferences.cartReminders}
+                disabled={!pushEnabled || busy}
+                onValueChange={(value) => void updatePreference('cartReminders', value)}
+                trackColor={{ true: colors.brand, false: colors.border }}
+                thumbColor={colors.surface}
+              />
+            }
+          />
+          <ListRow
+            title="Ofertas dos produtos que compro"
+            subtitle="Usa só as compras que você confirmar no app."
+            divider
+            right={
+              <Switch
+                accessibilityLabel="Ofertas dos produtos que compro"
+                value={preferences.personalizedOffers}
+                disabled={!pushEnabled || busy}
+                onValueChange={(value) => void updatePreference('personalizedOffers', value)}
+                trackColor={{ true: colors.brand, false: colors.border }}
+                thumbColor={colors.surface}
+              />
+            }
+          />
           {pushError ? (
-            <Text style={{ color: colors.danger, padding: spacing.md }}>{pushError}</Text>
+            <View style={styles.cardBodyPad}>
+              <Notice tone="error" message={pushError} />
+            </View>
           ) : null}
-          <View style={styles.menuRow}>
-            <Text style={styles.menuLabel}>Lembrar carrinho pendente</Text>
-            <Switch
-              accessibilityLabel="Lembrar carrinho pendente"
-              value={preferences.cartReminders}
-              disabled={!pushEnabled || busy}
-              onValueChange={(value) => void updatePreference('cartReminders', value)}
-              trackColor={{ true: colors.brand, false: colors.border }}
-              thumbColor="#fff"
-            />
-          </View>
-          <View style={styles.menuRow}>
-            <Text style={styles.menuLabel}>Ofertas dos produtos que compro</Text>
-            <Switch
-              accessibilityLabel="Ofertas dos produtos que compro"
-              value={preferences.personalizedOffers}
-              disabled={!pushEnabled || busy}
-              onValueChange={(value) => void updatePreference('personalizedOffers', value)}
-              trackColor={{ true: colors.brand, false: colors.border }}
-              thumbColor="#fff"
-            />
-          </View>
-          <Text style={{ ...typography.caption, color: colors.textMuted, padding: spacing.md }}>
-            Ofertas personalizadas usam as compras que você confirmar no app. Itens apenas
-            escaneados ou prévias salvas não contam como compras.
-          </Text>
-          <View style={styles.menuDivider} />
-          <MenuRow icon="briefcase" label="Área do lojista" onPress={() => router.push('/admin')} />
-          <View style={styles.menuDivider} />
-          <MenuRow
+        </Card>
+
+        <Card padded={false}>
+          <ListRow icon="map-pin" title="Lojas" onPress={() => router.push('/lojas')} />
+          <ListRow
+            icon="briefcase"
+            title="Área do lojista"
+            divider
+            onPress={() => router.push('/admin')}
+          />
+          <ListRow
             icon="help-circle"
-            label="Ajuda e suporte"
+            title="Ajuda e suporte"
+            divider
             onPress={() =>
-              Alert.alert(
-                'Ajuda e suporte',
-                'Fale com a gente pelo e-mail contato@scanmercado.com.br',
-              )
+              showMessage('Ajuda e suporte', 'Fale com a gente pelo e-mail contato@scanmercado.com.br')
             }
           />
         </Card>
 
-        <Card style={{ marginTop: spacing.lg, padding: 0 }}>
-          <MenuRow icon="log-out" label="Sair da conta" onPress={logout} danger />
+        <Card padded={false}>
+          <ListRow icon="log-out" title="Sair da conta" onPress={logout} danger />
         </Card>
-      </ScrollView>
+      </Screen>
     );
   }
 
   const handleLogin = async () => {
+    if (registering && name.trim().length < 2) {
+      setLoginError('Informe seu nome.');
+      return;
+    }
     if (cpf.length !== 11 || password.length === 0) {
-      Alert.alert('Preencha os campos', 'Digite o CPF (11 dígitos) e a senha.');
+      setLoginError('Digite o CPF (11 dígitos) e a senha.');
       return;
     }
     setIsSubmitting(true);
@@ -301,258 +301,136 @@ export default function ProfileScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView
-        contentContainerStyle={{
-          padding: spacing.xl,
-          flexGrow: 1,
-          justifyContent: 'center',
-        }}
+      <Screen
+        header={
+          <ScreenHeader
+            title="Conta"
+            subtitle="Entre para ver seus pontos e ativar ofertas do clube."
+          />
+        }
       >
-        <Text style={styles.title}>{registering ? 'Criar conta do clube' : 'Entrar'}</Text>
-        <Text style={styles.subtitle}>
-          Faça login para consultar seus pontos e ativar ofertas exclusivas.
-        </Text>
-
-        {loginError ? (
-          <Text style={{ color: colors.danger }} accessibilityLiveRegion="polite">
-            {loginError}
-          </Text>
-        ) : null}
-        {registering ? (
-          <>
-            <Text style={styles.label}>Nome</Text>
-            <TextInput
-              style={styles.input}
+        <Card style={styles.stack}>
+          <View style={styles.cardTitleRow}>
+            <Text style={styles.cardTitle}>
+              {registering ? 'Criar conta do clube' : 'Entrar'}
+            </Text>
+            {!isApiConfigured ? <Badge label="Demonstração" /> : null}
+          </View>
+          {loginError ? <Notice tone="error" message={loginError} /> : null}
+          {registering ? (
+            <TextField
+              label="Nome"
               value={name}
               onChangeText={setName}
               placeholder="Seu nome"
-              accessibilityLabel="Nome"
+              autoComplete="name"
             />
-          </>
-        ) : null}
-        <Text style={styles.label}>CPF</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Somente números"
-          keyboardType="numeric"
-          maxLength={11}
-          value={cpf}
-          onChangeText={(value) => setCpf(formatCpfInput(value))}
-          accessibilityLabel="CPF"
-        />
-
-        <Text style={styles.label}>Senha</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="••••••"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-          accessibilityLabel="Senha"
-        />
-
-        <Button
-          label={isSubmitting ? 'Aguarde…' : registering ? 'Criar conta' : 'Entrar'}
-          onPress={handleLogin}
-          loading={isSubmitting}
-          fullWidth
-          style={{ marginTop: spacing.xl }}
-        />
-
-        {isApiConfigured ? (
-          <Button
-            label={registering ? 'Já tenho conta' : 'Criar conta do clube'}
-            variant="ghost"
-            onPress={() => {
-              setRegistering(!registering);
-              setLoginError(null);
-            }}
-            disabled={isSubmitting}
+          ) : null}
+          <TextField
+            label="CPF"
+            placeholder="Somente números"
+            keyboardType="numeric"
+            maxLength={11}
+            value={cpf}
+            onChangeText={(value) => setCpf(formatCpfInput(value))}
           />
-        ) : (
-          <Text style={styles.demoHint}>Demonstração: CPF 12345678900, senha 123456</Text>
-        )}
-        {registering ? (
-          <Text style={styles.demoHint}>
-            Use uma senha com pelo menos 8 caracteres. Seus dados identificam sua conta e os
-            benefícios desta rede.
-          </Text>
-        ) : null}
+          <TextField
+            label="Senha"
+            placeholder="••••••"
+            secureTextEntry
+            value={password}
+            onChangeText={setPassword}
+            onSubmitEditing={handleLogin}
+            hint={registering ? 'Mínimo de 8 caracteres.' : undefined}
+          />
+          <Button
+            label={registering ? 'Criar conta' : 'Entrar'}
+            onPress={handleLogin}
+            loading={isSubmitting}
+            fullWidth
+          />
+          {isApiConfigured ? (
+            <Button
+              label={registering ? 'Já tenho conta' : 'Criar conta do clube'}
+              variant="ghost"
+              onPress={() => {
+                setRegistering(!registering);
+                setLoginError(null);
+              }}
+              disabled={isSubmitting}
+            />
+          ) : (
+            <Text style={styles.demoHint}>Demonstração: CPF 12345678900, senha 123456</Text>
+          )}
+        </Card>
 
         <BudgetSection />
 
-        <Button
-          label="Área do lojista"
-          variant="ghost"
-          onPress={() => router.push('/admin')}
-          style={{ marginTop: spacing.lg }}
-        />
-      </ScrollView>
+        <Card padded={false}>
+          <ListRow icon="map-pin" title="Lojas" onPress={() => router.push('/lojas')} />
+          <ListRow
+            icon="briefcase"
+            title="Área do lojista"
+            divider
+            onPress={() => router.push('/admin')}
+          />
+        </Card>
+      </Screen>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surfaceAlt },
-  title: { ...typography.h1, color: colors.text },
-  subtitle: {
-    ...typography.body,
-    color: colors.textMuted,
-    marginTop: spacing.xs,
-    marginBottom: spacing.sm,
-  },
-  label: {
-    ...typography.small,
-    fontWeight: '700',
-    color: colors.textMuted,
-    marginBottom: 6,
-    marginTop: spacing.md,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    ...typography.body,
-    backgroundColor: colors.surface,
-  },
-  demoHint: {
-    ...typography.small,
-    color: colors.textFaint,
-    textAlign: 'center',
-    marginTop: spacing.lg,
-  },
-  loggedHeader: { alignItems: 'center' },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.brand,
+  flex: { flex: 1 },
+  stack: { gap: spacing.md },
+  inlineForm: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
+  cardTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  cardTitle: { ...typography.h2, color: colors.text },
+  cardSubtitle: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+  cardHeaderPad: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.xs },
+  cardBodyPad: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.sm,
+    minHeight: 32,
   },
-  avatarText: { color: '#fff', fontSize: 24, fontWeight: '700' },
-  name: { ...typography.h2, color: colors.text },
-  cpf: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
-  loyaltyCard: {
-    marginTop: spacing.lg,
+  sectionTitle: { ...typography.h2, color: colors.text },
+  emptyHint: { ...typography.caption, color: colors.textMuted },
+  amount: { ...typography.bodyStrong, color: colors.text },
+  demoHint: { ...typography.small, color: colors.textMuted, textAlign: 'center' },
+  budgetCurrent: { ...typography.caption, color: colors.brandDark, fontWeight: '600' },
+  memberCard: {
     backgroundColor: colors.surfaceDark,
     borderRadius: radius.xl,
     padding: spacing.lg,
     gap: spacing.lg,
   },
-  loyaltyTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+  memberTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.onDarkSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  loyaltyCardLabel: { color: colors.textFaint, ...typography.small },
-  loyaltyCardName: {
-    color: colors.onBrand,
-    ...typography.bodyStrong,
-    marginTop: 2,
-  },
+  avatarText: { color: colors.onBrand, fontSize: 20, fontWeight: '800' },
+  memberName: { ...typography.h2, color: colors.onBrand },
+  memberMeta: { ...typography.caption, color: colors.textFaint, marginTop: 2 },
   tierBadge: {
-    backgroundColor: colors.brand,
+    backgroundColor: colors.onDarkSoft,
     borderRadius: radius.pill,
     paddingHorizontal: spacing.md,
     paddingVertical: 5,
   },
-  tierBadgeText: {
-    color: colors.onBrand,
-    ...typography.small,
-    fontWeight: '700',
-  },
-  loyaltyBottom: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-  },
-  loyaltyPointsValue: {
-    color: colors.brand,
-    fontSize: 26,
-    fontWeight: '800',
-    marginTop: 2,
-  },
-  sectionHeaderRow: {
+  tierBadgeText: { color: colors.onBrand, ...typography.small, fontWeight: '700' },
+  memberBottom: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  sectionTitle: { ...typography.h2, color: colors.text },
-  sectionAction: {
-    ...typography.caption,
-    color: colors.brand,
-    fontWeight: '700',
-  },
-  sectionSubtitle: {
-    ...typography.caption,
-    color: colors.textMuted,
-    marginTop: 2,
-    marginBottom: spacing.md,
-  },
-  emptyHint: { ...typography.body, color: colors.textMuted },
-  favoriteRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  favoriteName: { ...typography.bodyStrong, color: colors.text },
-  favoritePrice: {
-    ...typography.caption,
-    color: colors.textMuted,
-    marginTop: 2,
-  },
-  purchaseRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  purchaseTotal: { ...typography.bodyStrong, color: colors.text },
-  menuRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-  },
-  menuLabel: {
-    flex: 1,
-    ...typography.body,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  menuDivider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginLeft: spacing.lg,
-  },
-  budgetRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  budgetPrefix: { ...typography.bodyStrong, color: colors.textMuted },
-  budgetInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    ...typography.body,
-  },
-  budgetCurrent: {
-    ...typography.caption,
-    color: colors.brandDark,
-    marginTop: spacing.sm,
-    fontWeight: '600',
   },
 });

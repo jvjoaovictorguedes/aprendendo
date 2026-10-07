@@ -22,9 +22,12 @@ export function BudgetProvider({ children }: PropsWithChildren) {
   const [limit, setLimitState] = useState<number | null>(null);
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
-      if (raw) setLimitState(JSON.parse(raw));
-    });
+    AsyncStorage.getItem(STORAGE_KEY)
+      .then((raw) => {
+        const saved = raw ? JSON.parse(raw) : null;
+        if (typeof saved === 'number' && saved > 0) setLimitState(saved);
+      })
+      .catch(() => {});
   }, []);
 
   const setLimit = useCallback((value: number | null) => {

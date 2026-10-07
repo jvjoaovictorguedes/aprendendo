@@ -3,11 +3,12 @@ import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { StoreSelector } from '../../components/StoreSelector';
 import { OfferCard } from '../../components/OfferCard';
 import { cartItemKey } from '../../types';
-import { Button, Icon } from '../../components/ui';
+import { Badge, Button, Icon } from '../../components/ui';
 import { useBudget } from '../../context/BudgetContext';
 import { useCart } from '../../context/CartContext';
 import { useLists } from '../../context/ListsContext';
@@ -33,6 +34,7 @@ type Feedback =
 
 export default function ComprarScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
   const [permission, requestPermission] = useCameraPermissions();
   const { items, addByBarcode, decrementItem } = useCart();
@@ -64,6 +66,11 @@ export default function ComprarScreen() {
 
   useEffect(() => {
     if (limit == null) return;
+
+    // Carrinho esvaziou ou caiu abaixo do limite (nova compra, item removido):
+    // os avisos podem aparecer de novo.
+    if (totals.finalTotal <= limit) hasExceededRef.current = false;
+    if (totals.finalTotal / limit < budgetWarningThreshold) hasWarnedRef.current = false;
 
     if (totals.finalTotal > limit && !hasExceededRef.current) {
       hasExceededRef.current = true;
@@ -154,8 +161,10 @@ export default function ComprarScreen() {
 
   if (!permission.granted) {
     return (
-      <View style={styles.center}>
-        <Icon name="camera" size={40} color={colors.brand} />
+      <View style={[styles.center, { paddingTop: insets.top }]}>
+        <View style={styles.permissionIcon}>
+          <Icon name="camera" size={32} color={colors.brandDark} />
+        </View>
         <Text style={styles.permissionTitle}>Câmera necessária</Text>
         <Text style={styles.permissionText}>
           Para bipar os produtos, o {brand.name} precisa acessar a câmera do seu celular.
@@ -166,8 +175,8 @@ export default function ComprarScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <StoreSelector />
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <StoreSelector compact />
       <View style={styles.cameraArea}>
         <CameraView
           style={StyleSheet.absoluteFill}
@@ -181,97 +190,101 @@ export default function ComprarScreen() {
         <View style={[StyleSheet.absoluteFill, styles.scanFrameWrapper]} pointerEvents="none">
           <View style={styles.scanFrame} />
         </View>
-      </View>
-
-      {activeList ? (
-        <View style={styles.listBanner}>
-          <Text style={styles.listBannerText}>
-            📋 Comprando a partir de &quot;{activeList.name}&quot;
-          </Text>
-        </View>
-      ) : null}
-
-      {feedback ? (
-        <View
-          style={[
-            styles.feedbackBanner,
-            (feedback.type === 'not_found' || feedback.type === 'error') &&
-              styles.feedbackBannerError,
-          ]}
-        >
-          {feedback.type === 'checking' ? (
-            <Text style={styles.feedbackTitle}>Verificando produto…</Text>
-          ) : feedback.type === 'added' ? (
-            <>
-              <Text style={styles.feedbackTitle}>✓ Produto adicionado</Text>
-              <Text style={styles.feedbackName}>{feedback.name}</Text>
-              <View style={styles.feedbackRow}>
-                <Text style={styles.feedbackPrice}>
-                  {feedback.weight ? `${feedback.weight} · ` : ''}
-                  {feedback.price}
-                </Text>
-                <TouchableOpacity onPress={handleUndo} hitSlop={8}>
-                  <Text style={styles.feedbackUndo}>Desfazer</Text>
-                </TouchableOpacity>
-              </View>
-              {feedback.fromList ? (
-                <Text style={styles.feedbackListMatch}>✓ Item da sua lista</Text>
-              ) : null}
-              {feedback.offline ? (
-                <Text style={styles.feedbackOffline}>
-                  ⚠ Catálogo local (sem conexão com o servidor)
-                </Text>
-              ) : null}
-            </>
-          ) : feedback.type === 'error' ? (
-            <>
-              <Text style={styles.feedbackTitle}>Não foi possível consultar o preço</Text>
-              <Text style={styles.feedbackOffline}>{feedback.message} · Escaneie novamente.</Text>
-            </>
-          ) : (
-            <>
-              <Text style={styles.feedbackTitle}>Produto não cadastrado ({feedback.barcode})</Text>
-              <Text style={styles.feedbackOffline}>
-                {feedback.offline
-                  ? '⚠ Buscado no catálogo local — sem conexão com o servidor'
-                  : '✓ Verificado no catálogo da loja — código não cadastrado'}
+        <View style={styles.overlay} pointerEvents="box-none">
+          {activeList ? (
+            <View style={styles.listBanner}>
+              <Text style={styles.listBannerText}>
+                📋 Comprando a partir de &quot;{activeList.name}&quot;
               </Text>
-            </>
+            </View>
+          ) : null}
+
+          {feedback ? (
+            <View
+              style={[
+                styles.feedbackBanner,
+                (feedback.type === 'not_found' || feedback.type === 'error') &&
+                  styles.feedbackBannerError,
+              ]}
+            >
+              {feedback.type === 'checking' ? (
+                <Text style={styles.feedbackTitle}>Verificando produto…</Text>
+              ) : feedback.type === 'added' ? (
+                <>
+                  <Text style={styles.feedbackTitle}>✓ Produto adicionado</Text>
+                  <Text style={styles.feedbackName}>{feedback.name}</Text>
+                  <View style={styles.feedbackRow}>
+                    <Text style={styles.feedbackPrice}>
+                      {feedback.weight ? `${feedback.weight} · ` : ''}
+                      {feedback.price}
+                    </Text>
+                    <TouchableOpacity onPress={handleUndo} hitSlop={8}>
+                      <Text style={styles.feedbackUndo}>Desfazer</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {feedback.fromList ? (
+                    <Text style={styles.feedbackListMatch}>✓ Item da sua lista</Text>
+                  ) : null}
+                  {feedback.offline ? (
+                    <Text style={styles.feedbackOffline}>
+                      ⚠ Catálogo de demonstração (API não configurada)
+                    </Text>
+                  ) : null}
+                </>
+              ) : feedback.type === 'error' ? (
+                <>
+                  <Text style={styles.feedbackTitle}>Não foi possível consultar o preço</Text>
+                  <Text style={styles.feedbackOffline}>{feedback.message} · Escaneie novamente.</Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.feedbackTitle}>Produto não cadastrado ({feedback.barcode})</Text>
+                  <Text style={styles.feedbackOffline}>
+                    {feedback.offline
+                      ? '⚠ Buscado no catálogo de demonstração (API não configurada)'
+                      : '✓ Verificado no catálogo da loja — código não cadastrado'}
+                  </Text>
+                </>
+              )}
+            </View>
+          ) : (
+            <View style={styles.hintBanner}>
+              <Text style={styles.hintText}>Aponte a câmera para o código de barras</Text>
+            </View>
           )}
         </View>
-      ) : (
-        <View style={styles.hintBanner}>
-          <Text style={styles.hintText}>Aponte a câmera para o código de barras</Text>
-        </View>
-      )}
+      </View>
 
       {lastItem && lastTotal ? (
-        <ScrollView
-          style={{ maxHeight: 240, backgroundColor: colors.surface }}
-          contentContainerStyle={{ padding: spacing.md }}
-        >
-          <Text style={{ ...typography.bodyStrong, color: colors.text }}>
-            {lastItem.product.name} · {lastItem.quantity} item(ns)
-          </Text>
-          <Text style={{ color: colors.textMuted }}>
-            Normal: {formatBRL(lastTotal.originalTotal)} · Economia: {formatBRL(lastTotal.savings)}
-          </Text>
-          <Text style={{ ...typography.h2, color: colors.brandDark }}>
-            No carrinho: {formatBRL(lastTotal.finalTotal)}
-          </Text>
+        <ScrollView style={styles.lastPanel} contentContainerStyle={styles.lastPanelContent}>
+          <View style={styles.lastHeader}>
+            <Text style={styles.lastName} numberOfLines={1}>
+              {lastItem.product.name}
+            </Text>
+            <Text style={styles.lastQty}>{lastItem.quantity}x</Text>
+          </View>
+          <View style={styles.lastHeader}>
+            <Text style={styles.lastMeta}>
+              Normal {formatBRL(lastTotal.originalTotal)}
+              {lastTotal.savings > 0 ? ` · economia ${formatBRL(lastTotal.savings)}` : ''}
+            </Text>
+            <Text style={styles.lastTotal}>{formatBRL(lastTotal.finalTotal)}</Text>
+          </View>
+          {lastItem.product.promotion ? (
+            <View style={styles.lastPromo}>
+              <Badge label={lastItem.product.promotion.label} variant="danger" />
+              <Text style={styles.lastMeta}>
+                {lastItem.product.promotion.endsAt
+                  ? `Até ${new Date(lastItem.product.promotion.endsAt).toLocaleDateString('pt-BR')}`
+                  : 'Sem data de encerramento'}
+              </Text>
+            </View>
+          ) : null}
           {lastOffers
             .filter((o) => o.audience === 'club')
             .map((o) => (
               <OfferCard key={o.id} offer={o} />
             ))}
-          {lastItem.product.promotion ? (
-            <Text style={{ ...typography.caption, color: colors.textMuted }}>
-              {lastItem.product.promotion.label} · {lastItem.product.promotion.conditions} ·{' '}
-              {lastItem.product.promotion.endsAt
-                ? `Até ${new Date(lastItem.product.promotion.endsAt).toLocaleString('pt-BR')}`
-                : 'Oferta sem data de encerramento'}
-            </Text>
-          ) : null}
         </ScrollView>
       ) : null}
       <TouchableOpacity style={styles.totalBar} onPress={() => router.push('/cart')}>
@@ -293,8 +306,15 @@ export default function ComprarScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
+  container: { flex: 1, backgroundColor: colors.surfaceDark },
   cameraArea: { flex: 1 },
+  overlay: {
+    position: 'absolute',
+    top: spacing.lg,
+    left: spacing.lg,
+    right: spacing.lg,
+    gap: spacing.sm,
+  },
   scanFrameWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -303,7 +323,8 @@ const styles = StyleSheet.create({
     width: 260,
     height: 160,
     borderWidth: 3,
-    borderColor: colors.brand,
+    // Branco: visível sobre a imagem da câmera, qualquer que seja a cor da marca.
+    borderColor: colors.surface,
     borderRadius: radius.xl,
     backgroundColor: 'transparent',
   },
@@ -312,7 +333,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.xl,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceAlt,
     gap: spacing.sm,
   },
   permissionTitle: {
@@ -327,64 +348,79 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   listBanner: {
-    position: 'absolute',
-    top: spacing.lg,
-    left: spacing.lg,
-    right: spacing.lg,
     backgroundColor: colors.overlay,
     borderRadius: radius.md,
     paddingVertical: spacing.sm,
     alignItems: 'center',
   },
-  listBannerText: { color: '#fff', ...typography.small },
+  listBannerText: { color: colors.onBrand, ...typography.small },
   hintBanner: {
-    position: 'absolute',
-    top: spacing.lg,
-    left: spacing.lg,
-    right: spacing.lg,
     backgroundColor: colors.overlay,
     borderRadius: radius.md,
     paddingVertical: spacing.md,
     alignItems: 'center',
   },
-  hintText: { color: '#fff', ...typography.caption },
+  hintText: { color: colors.onBrand, ...typography.caption },
   feedbackBanner: {
-    position: 'absolute',
-    top: spacing.lg,
-    left: spacing.lg,
-    right: spacing.lg,
     backgroundColor: colors.brand,
     borderRadius: radius.md,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
   },
   feedbackBannerError: { backgroundColor: colors.danger },
-  feedbackTitle: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  feedbackName: { color: '#fff', ...typography.h2, marginTop: 2 },
+  feedbackTitle: { color: colors.onBrand, fontWeight: '700', fontSize: 15 },
+  feedbackName: { color: colors.onBrand, ...typography.h2, marginTop: 2 },
   feedbackRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: 4,
   },
-  feedbackPrice: { color: '#fff', ...typography.bodyStrong },
+  feedbackPrice: { color: colors.onBrand, ...typography.bodyStrong },
   feedbackUndo: {
-    color: '#fff',
+    color: colors.onBrand,
     ...typography.caption,
     textDecorationLine: 'underline',
   },
   feedbackListMatch: {
-    color: '#fff',
+    color: colors.onBrand,
     ...typography.small,
     marginTop: spacing.xs,
     fontWeight: '700',
   },
   feedbackOffline: {
-    color: '#fff',
+    color: colors.onBrand,
     ...typography.small,
     marginTop: spacing.xs,
     opacity: 0.85,
   },
+  permissionIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: colors.brandSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lastPanel: {
+    maxHeight: 240,
+    backgroundColor: colors.surfaceAlt,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    marginTop: -radius.xl,
+  },
+  lastPanelContent: { padding: spacing.lg, gap: spacing.xs },
+  lastHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    gap: spacing.sm,
+  },
+  lastName: { ...typography.bodyStrong, color: colors.text, flex: 1 },
+  lastQty: { ...typography.caption, color: colors.textMuted },
+  lastMeta: { ...typography.caption, color: colors.textMuted, flexShrink: 1 },
+  lastTotal: { ...typography.h2, color: colors.text },
+  lastPromo: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
   totalBar: {
     backgroundColor: colors.surface,
     paddingVertical: spacing.lg,

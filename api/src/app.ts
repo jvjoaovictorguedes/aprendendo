@@ -23,8 +23,9 @@ export async function buildApp(
   options: FastifyServerOptions = {},
 ) {
   // trustProxy: no Railway a API fica atrás do proxy deles — o IP real
-  // (usado no limite de tentativas de login) vem no X-Forwarded-For.
-  const app = Fastify({ trustProxy: true, ...options });
+  // (usado no limite de tentativas de login) vem no X-Forwarded-For. Só os
+  // últimos TRUST_PROXY_HOPS endereços são confiáveis; o resto vem do cliente.
+  const app = Fastify({ trustProxy: config.TRUST_PROXY_HOPS || false, ...options });
   const deps: Deps = { db, config, limiter: new LoginRateLimiter() };
 
   const origins = config.CORS_ORIGINS.split(',')
