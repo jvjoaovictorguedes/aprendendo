@@ -11,6 +11,7 @@ import { authRoutes } from './routes/auth.js';
 import { offerRoutes } from './routes/offers.js';
 import { publicRoutes } from './routes/public.js';
 import { engagementRoutes } from './routes/engagement.js';
+import { platformNotificationRoutes } from './routes/platformNotifications.js';
 import { demoRoutes } from './routes/demo.js';
 
 export type Deps = {
@@ -26,7 +27,12 @@ export async function buildApp(
   // trustProxy: no Railway a API fica atrás do proxy deles — o IP real
   // (usado no limite de tentativas de login) vem no X-Forwarded-For. Só os
   // últimos TRUST_PROXY_HOPS endereços são confiáveis; o resto vem do cliente.
-  const app = Fastify({ trustProxy: config.TRUST_PROXY_HOPS || false, ...options });
+  const app = Fastify({
+    trustProxy: config.TRUST_PROXY_HOPS
+      ? (_address: string, hop: number) => hop < config.TRUST_PROXY_HOPS
+      : false,
+    ...options,
+  });
   const deps: Deps = { db, config, limiter: new LoginRateLimiter() };
 
   const origins = config.CORS_ORIGINS.split(',')
@@ -65,5 +71,6 @@ export async function buildApp(
   });
   await app.register(async (scope) => demoRoutes(scope, deps));
 
+  await app.register(async (scope) => platformNotificationRoutes(scope, deps));
   return app;
 }

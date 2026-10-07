@@ -51,3 +51,19 @@ Todas as rotas exigem sessão de cliente. A franquia e o usuário vêm da sessã
 | POST `/customer/notifications/:id/read`    | Leitura e abertura da própria notificação                  |
 
 `cd api && npm test` verifica consentimento, isolamento, regras, duplicação, horário, fila, logout e recibos usando PostgreSQL em memória e transporte de push falso. Não envia notificações para celulares reais. TypeScript, lint, fluxo web e export Android complementam essa validação; o teste físico depende das credenciais e do build instalado.
+
+## Parâmetros pelo painel da plataforma
+
+Em **Plataforma → Notificações**, somente `platform_admin` pode consultar e alterar as regras. O lojista não vê o módulo e a API recusa acesso de `tenant_admin` e clientes, inclusive por URL direta.
+
+As regras são globais para todas as franquias e ficam no PostgreSQL (`006_notification_policy.sql`), com responsável e data da última alteração. A rotina lê os parâmetros a cada rodada; mudanças entram na próxima rodada, normalmente em até um minuto, sem reiniciar a API ou gerar outro build para alterar os valores.
+
+É possível pausar campanhas, configurar fuso, início/fim da janela (fim exclusivo, com suporte à meia-noite), espera do carrinho de 1 a 1440 minutos, intervalo mínimo entre avisos por cliente de 1 a 10080 minutos, quantidade mínima de compras de 1 a 50 e histórico de 1 a 365 dias. Até a primeira gravação, os padrões continuam sendo 8h–22h, 120 minutos no carrinho, intervalo de 1440 minutos, três compras em 90 dias; fuso e espera inicial também respeitam as variáveis existentes.
+
+**Preencher valores para teste** coloca janela 0h–24h, espera de um minuto, intervalo de um minuto e recorrência a partir de uma compra. Isso apenas preenche o formulário: é preciso salvar para aplicar. **Preencher valores padrão** também exige salvar. Intervalos curtos afetam todos os clientes autorizados; restaure os padrões depois do teste.
+
+Consentimento, sessão válida, oferta vigente, deduplicação por carrinho/oferta e exclusão de lojas marcadas como demonstração continuam obrigatórios. Para receber novo lembrete, limpe/conclua e inicie outro carrinho. Não há botão que apague histórico ou envie campanhas em massa. A pausa preserva a fila, e os avisos são revalidados ao retomar.
+
+`PUSH_ENABLED=true` no Railway e as credenciais FCM/APNs continuam necessários para envio real; o painel informa quando a flag do servidor está desligada. O teste precisa de build instalado e permissão, em uma franquia de teste não marcada como demonstração. A loja fictícia `55555555-5555-4555-8555-555555555555` permanece sem push real.
+
+Rotas exclusivas da plataforma: GET/PUT `/admin/notification-settings`. O switch pausa/retoma a rotina de campanhas; não modifica a permissão do celular nem o consentimento individual. A pausa não recolhe notificações já aceitas pelo provedor.
