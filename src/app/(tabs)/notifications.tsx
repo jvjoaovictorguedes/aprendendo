@@ -2,7 +2,7 @@ import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native
 import { useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
 
-import { EmptyState, Icon } from '../../components/ui';
+import { EmptyState, Icon, Screen, ScreenHeader } from '../../components/ui';
 import { useNotifications } from '../../context/NotificationsContext';
 import { NotificationItem, NotificationKind } from '../../data/notifications';
 import { colors, radius, spacing, typography } from '../../theme/tokens';
@@ -33,69 +33,81 @@ export default function NotificationsScreen() {
     }, [refreshInbox]),
   );
 
+  const header = (
+    <ScreenHeader
+      title="Notificações"
+      subtitle={unreadCount > 0 ? `${unreadCount} não lida(s)` : undefined}
+      back
+      right={
+        unreadCount > 0 ? (
+          <TouchableOpacity onPress={markAllAsRead} accessibilityRole="button">
+            <Text style={styles.markAllText}>Marcar como lidas</Text>
+          </TouchableOpacity>
+        ) : null
+      }
+    />
+  );
+
   if (notifications.length === 0) {
     return (
-      <View style={styles.container}>
+      <Screen header={header}>
         <EmptyState
+          emoji="🔔"
           title="Nenhuma notificação"
           subtitle="Avisos de cupons e orçamento aparecem aqui."
-          emoji="🔔"
         />
-      </View>
+      </Screen>
     );
   }
 
   return (
-    <FlatList
-      style={styles.container}
-      contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm }}
-      data={notifications}
-      keyExtractor={(item) => item.id}
-      ListHeaderComponent={
-        unreadCount > 0 ? (
-          <TouchableOpacity onPress={markAllAsRead} style={styles.markAllButton}>
-            <Text style={styles.markAllText}>Marcar tudo como lido</Text>
+    <Screen header={header} scroll={false}>
+      <FlatList
+        contentContainerStyle={styles.list}
+        data={notifications}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }: { item: NotificationItem }) => (
+          <TouchableOpacity
+            style={[styles.card, !item.read && styles.cardUnread]}
+            onPress={() => openNotification(item)}
+            accessibilityRole="button"
+          >
+            <View style={styles.iconWrap}>
+              <Icon name={KIND_ICON[item.kind]} size={18} color={colors.brandDark} />
+            </View>
+            <View style={styles.flex}>
+              <Text style={styles.title}>{item.title}</Text>
+              <Text style={styles.body}>{item.body}</Text>
+              <Text style={styles.time}>{timeAgo(item.createdAt)}</Text>
+            </View>
+            {!item.read ? <View style={styles.unreadDot} /> : null}
           </TouchableOpacity>
-        ) : null
-      }
-      renderItem={({ item }: { item: NotificationItem }) => (
-        <TouchableOpacity
-          style={[styles.card, !item.read && styles.cardUnread]}
-          onPress={() => openNotification(item)}
-        >
-          <View style={styles.iconWrap}>
-            <Icon name={KIND_ICON[item.kind]} size={18} color={colors.brand} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.title}>{item.title}</Text>
-            <Text style={styles.body}>{item.body}</Text>
-            <Text style={styles.time}>{timeAgo(item.createdAt)}</Text>
-          </View>
-          {!item.read ? <View style={styles.unreadDot} /> : null}
-        </TouchableOpacity>
-      )}
-    />
+        )}
+      />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surfaceAlt },
-  markAllButton: { alignSelf: 'flex-end', marginBottom: spacing.sm },
-  markAllText: { ...typography.caption, color: colors.brand, fontWeight: '700' },
+  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.sm },
+  flex: { flex: 1 },
+  markAllText: { ...typography.caption, color: colors.brandDark, fontWeight: '700' },
   card: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: spacing.md,
     backgroundColor: colors.surface,
-    borderRadius: radius.xl,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
     padding: spacing.md,
     alignItems: 'flex-start',
   },
-  cardUnread: { backgroundColor: colors.brandSoft },
+  cardUnread: { borderColor: colors.brand },
   iconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
+    width: 36,
+    height: 36,
+    borderRadius: radius.md,
+    backgroundColor: colors.brandSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },

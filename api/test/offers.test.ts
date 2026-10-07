@@ -25,6 +25,12 @@ before(async () => {
   });
   assert.equal(created.status, 201);
   owner = await api.login('owner@test.com', created.body.temporaryPassword);
+  // O painel só libera as rotas depois de trocar a senha temporária.
+  const changed = await api.request('POST', '/auth/change-password', {
+    token: owner,
+    body: { currentPassword: created.body.temporaryPassword, newPassword: 'owner-password' },
+  });
+  assert.equal(changed.status, 200);
   customer = (
     await api.request('POST', '/auth/customer/login', {
       tenant: PILOT,

@@ -10,7 +10,7 @@ import {
   revokeUserSessions,
   type Role,
 } from '../auth/session.js';
-import { badRequest, unauthorized } from '../errors.js';
+import { badRequest, forbidden, unauthorized } from '../errors.js';
 import { toMe } from '../mappers.js';
 import { email, password, tenantIdHeader, validCpf } from '../validation.js';
 
@@ -22,7 +22,9 @@ type LoginRow = {
 };
 
 export async function authRoutes(app: FastifyInstance, { db, config, limiter }: Deps) {
-  const authenticated = requireAuth(db, config.JWT_SECRET);
+  const authenticated = requireAuth(db, config.JWT_SECRET, undefined, {
+    allowPendingPasswordChange: true,
+  });
 
   async function finishLogin(
     row: LoginRow | undefined,
@@ -46,6 +48,19 @@ export async function authRoutes(app: FastifyInstance, { db, config, limiter }: 
       userAgent,
     });
     return token;
+  }
+
+  /** Franquia suspensa não aceita login nem cadastro de clientes no app. */
+  async function assertTenantOpen(tenantId: string) {
+    const { rows } = await db.query<{ status: string; is_demo: boolean }>(
+      'select status, is_demo from tenants where id = $1',
+      [tenantId],
+    );
+    if (!rows[0]) throw badRequest('Franquia não encontrada.');
+    if (rows[0].status === 'suspensa') {
+      throw forbidden('Este mercado está temporariamente indisponível no app.');
+    }
+    return rows[0];
   }
 
   /** Login do painel admin (equipe da plataforma e admins de franquia). */
@@ -79,6 +94,7 @@ export async function authRoutes(app: FastifyInstance, { db, config, limiter }: 
         password: z.string().min(1, 'Informe a senha.'),
       })
       .parse(request.body);
+    await assertTenantOpen(tenantId);
     const { rows } = await db.query<LoginRow>(
       `select id, role, password_hash, disabled_at from users
        where tenant_id = $1 and cpf = $2 and role = 'customer'`,
@@ -110,9 +126,7 @@ export async function authRoutes(app: FastifyInstance, { db, config, limiter }: 
         password,
       })
       .parse(request.body);
-    const tenant = (await db.query('select id,is_demo from tenants where id=$1', [tenantId]))
-      .rows[0];
-    if (!tenant) throw badRequest('Franquia não encontrada.');
+    const tenant = await assertTenantOpen(tenantId);
     if (tenant.is_demo)
       throw badRequest(
         'Use a conta fictícia da apresentação. Não cadastre dados pessoais nesta loja.',

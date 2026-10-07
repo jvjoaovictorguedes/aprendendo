@@ -26,6 +26,7 @@ const logoUrl = z
   .string()
   .trim()
   .url('URL do logo inválida.')
+  .refine((value) => /^https?:\/\//i.test(value), 'O logo precisa de um endereço http(s).')
   .nullable()
   .or(z.literal('').transform(() => null));
 

@@ -101,12 +101,26 @@ async function resolveToken(db: Db, secret: string, header: string | undefined):
   };
 }
 
-/** preHandler que exige login (e, se informado, um dos papéis). */
-export function requireAuth(db: Db, secret: string, roles?: Role[]): preHandlerAsyncHookHandler {
+/**
+ * preHandler que exige login (e, se informado, um dos papéis).
+ * Admin que entrou com senha temporária só usa as rotas de /auth (trocar
+ * senha, /me, sair) até criar a própria senha — a senha temporária costuma ser
+ * passada por mensagem e não pode virar acesso permanente ao painel.
+ */
+export function requireAuth(
+  db: Db,
+  secret: string,
+  roles?: Role[],
+  options: { allowPendingPasswordChange?: boolean } = {},
+): preHandlerAsyncHookHandler {
   return async (request: FastifyRequest, _reply: FastifyReply) => {
     const user = await resolveToken(db, secret, request.headers.authorization);
     if (!user) throw unauthorized('Sessão expirada ou inválida. Entre de novo.');
     if (roles && !roles.includes(user.role)) throw forbidden();
+    // Vale para o painel; o app do cliente ainda não tem tela de troca de senha.
+    if (user.mustChangePassword && user.role !== 'customer' && !options.allowPendingPasswordChange) {
+      throw forbidden('Crie sua senha antes de continuar (você entrou com uma senha temporária).');
+    }
     request.auth = user;
   };
 }

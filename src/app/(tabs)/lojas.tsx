@@ -1,10 +1,21 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
-import { ActivityIndicator, Linking, ScrollView, Text } from 'react-native';
-import { Button, Card } from '../../components/ui';
+import { ActivityIndicator, Linking, StyleSheet, Text, View } from 'react-native';
+
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Icon,
+  Notice,
+  Screen,
+  ScreenHeader,
+} from '../../components/ui';
 import { useStore } from '../../context/StoreContext';
 import { useCart } from '../../context/CartContext';
-import { colors, spacing, typography } from '../../theme/tokens';
+import { colors, radius, spacing, typography } from '../../theme/tokens';
+
 export default function StoresScreen() {
   const { stores, storeId, selectStore, loading, error, reload } = useStore();
   const { items, clearCart } = useCart();
@@ -23,69 +34,140 @@ export default function StoresScreen() {
     selectStore(id);
   }
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: colors.surfaceAlt }}
-      contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}
+    <Screen
+      header={
+        <ScreenHeader
+          title="Lojas"
+          subtitle="A loja escolhida define as ofertas e os preços."
+          back
+        />
+      }
     >
-      <Text style={{ ...typography.h1, color: colors.text }}>Escolha sua loja</Text>
-      <Text style={{ color: colors.textMuted }}>
-        A escolha filtra as ofertas. Você pode continuar sem selecionar uma loja.
-      </Text>
       {pending ? (
-        <Card>
-          <Text>
-            Trocar de loja limpa o carrinho para não misturar preços e benefícios de lojas
-            diferentes.
-          </Text>
-          <Button
-            label="Limpar carrinho e trocar"
-            onPress={() => {
-              clearCart();
-              selectStore(pending.id);
-              setPending(null);
-            }}
+        <Card style={styles.stack}>
+          <Notice
+            tone="warning"
+            title="Trocar de loja limpa o carrinho"
+            message="Assim não se misturam preços e benefícios de lojas diferentes."
           />
-          <Button label="Manter loja atual" variant="ghost" onPress={() => setPending(null)} />
+          <View style={styles.row}>
+            <Button
+              label="Manter loja"
+              variant="secondary"
+              onPress={() => setPending(null)}
+              style={styles.flex}
+            />
+            <Button
+              label="Limpar e trocar"
+              onPress={() => {
+                clearCart();
+                selectStore(pending.id);
+                setPending(null);
+              }}
+              style={styles.flex}
+            />
+          </View>
         </Card>
       ) : null}
-      <Button
-        label={storeId ? 'Ver ofertas de toda a rede' : 'Toda a rede selecionada ✓'}
-        variant="secondary"
-        onPress={() => choose(null)}
+
+      <StoreOption
+        title="Toda a rede"
+        subtitle="Só ofertas válidas em todas as lojas."
+        selected={!storeId}
+        onSelect={() => choose(null)}
       />
-      {loading ? <ActivityIndicator color={colors.brand} /> : null}
+
+      {loading && !stores.length ? <ActivityIndicator color={colors.brand} /> : null}
       {error ? (
-        <>
-          <Text style={{ color: colors.danger }}>{error}</Text>
-          <Button label="Tentar novamente" onPress={() => void reload()} disabled={loading} />
-        </>
+        <Notice
+          tone="error"
+          title="Não foi possível carregar as lojas"
+          message={error}
+          actionLabel="Tentar novamente"
+          onAction={() => void reload()}
+        />
       ) : null}
       {!loading && !error && !stores.length ? (
-        <Text>Nenhuma loja cadastrada. As ofertas gerais continuam disponíveis.</Text>
+        <EmptyState
+          emoji="🏬"
+          title="Nenhuma loja cadastrada"
+          subtitle="As ofertas gerais continuam disponíveis."
+        />
       ) : null}
       {stores.map((s) => (
-        <Card key={s.id} style={{ gap: spacing.sm }}>
-          <Text style={{ ...typography.h2, color: colors.text }}>{s.name}</Text>
-          <Text>{s.address}</Text>
-          <Text>{s.hours}</Text>
-          <Button
-            label={storeId === s.id ? 'Loja selecionada ✓' : 'Escolher esta loja'}
-            onPress={() => choose(s.id)}
-            variant={storeId === s.id ? 'secondary' : 'primary'}
-          />
-          {s.address ? (
-            <Button
-              label="Ver rota"
-              variant="ghost"
-              onPress={() =>
-                void Linking.openURL(
-                  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.address!)}`,
-                )
-              }
-            />
-          ) : null}
-        </Card>
+        <StoreOption
+          key={s.id}
+          title={s.name}
+          subtitle={[s.address, s.hours].filter(Boolean).join(' · ')}
+          selected={storeId === s.id}
+          onSelect={() => choose(s.id)}
+          onRoute={
+            s.address
+              ? () =>
+                  void Linking.openURL(
+                    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.address!)}`,
+                  )
+              : undefined
+          }
+        />
       ))}
-    </ScrollView>
+    </Screen>
   );
 }
+
+function StoreOption({
+  title,
+  subtitle,
+  selected,
+  onSelect,
+  onRoute,
+}: {
+  title: string;
+  subtitle?: string;
+  selected: boolean;
+  onSelect: () => void;
+  onRoute?: () => void;
+}) {
+  return (
+    <Card style={[styles.stack, selected && styles.selected]}>
+      <View style={styles.optionHeader}>
+        <View style={styles.iconWrap}>
+          <Icon name="map-pin" size={18} color={colors.brandDark} />
+        </View>
+        <View style={styles.flex}>
+          <Text style={styles.title}>{title}</Text>
+          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+        </View>
+        {selected ? <Badge label="Selecionada" variant="brand" /> : null}
+      </View>
+      {!selected || onRoute ? (
+        <View style={styles.row}>
+          {onRoute ? (
+            <Button label="Ver rota" variant="secondary" onPress={onRoute} style={styles.flex} />
+          ) : null}
+          {!selected ? (
+            <Button label="Escolher" onPress={onSelect} style={styles.flex} />
+          ) : null}
+        </View>
+      ) : null}
+    </Card>
+  );
+}
+
+const styles = StyleSheet.create({
+  stack: { gap: spacing.md },
+  row: { flexDirection: 'row', gap: spacing.sm },
+  flex: { flex: 1 },
+  selected: { borderWidth: 2, borderColor: colors.brand },
+  optionHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  iconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.md,
+    backgroundColor: colors.brandSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: { ...typography.bodyStrong, color: colors.text },
+  subtitle: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+});

@@ -1,11 +1,27 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { Badge, Button, Card, EmptyState } from '../../components/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Icon,
+  ListRow,
+  Screen,
+  ScreenHeader,
+  TextField,
+} from '../../components/ui';
 import { useLists } from '../../context/ListsContext';
 import { findProductByName } from '../../data/products';
-import { colors, radius, spacing, typography } from '../../theme/tokens';
+import { colors, hitSlop, radius, spacing, typography } from '../../theme/tokens';
+import { confirmAction } from '../../utils/dialogs';
+
+function progressText(bought: number, total: number) {
+  if (total === 0) return 'Lista vazia';
+  return `${bought} de ${total} ${total === 1 ? 'item comprado' : 'itens comprados'}`;
+}
 
 export default function ListsScreen() {
   const router = useRouter();
@@ -32,17 +48,16 @@ export default function ListsScreen() {
   };
 
   const handleRemoveList = (listId: string, name: string) => {
-    Alert.alert('Remover lista', `Remover "${name}"?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Remover',
-        style: 'destructive',
-        onPress: () => {
-          removeList(listId);
-          if (selectedListId === listId) setSelectedListId(null);
-        },
+    confirmAction({
+      title: 'Remover lista',
+      message: `Remover "${name}" e todos os itens dela?`,
+      confirmLabel: 'Remover',
+      destructive: true,
+      onConfirm: () => {
+        removeList(listId);
+        if (selectedListId === listId) setSelectedListId(null);
       },
-    ]);
+    });
   };
 
   const handleStartShopping = () => {
@@ -54,165 +69,139 @@ export default function ListsScreen() {
   if (selectedList) {
     const boughtCount = selectedList.items.filter((item) => item.bought).length;
     return (
-      <View style={styles.container}>
-        <View style={styles.detailHeader}>
-          <TouchableOpacity onPress={() => setSelectedListId(null)} hitSlop={8}>
-            <Text style={styles.backLink}>‹ Listas</Text>
-          </TouchableOpacity>
-          <Text style={styles.detailTitle}>{selectedList.name}</Text>
-          <Text style={styles.detailSubtitle}>
-            {boughtCount}/{selectedList.items.length} itens comprados
-          </Text>
-        </View>
-
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm }}>
-          {selectedList.items.length === 0 ? (
-            <EmptyState emoji="📝" title="Lista vazia" subtitle="Adicione o primeiro item abaixo." />
-          ) : (
-            selectedList.items.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                onPress={() => toggleBought(selectedList.id, item.id)}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: item.bought }}
-              >
-                <Card style={styles.itemRow} padded={false}>
-                  <View style={styles.itemLeft}>
-                    <View style={[styles.checkbox, item.bought && styles.checkboxChecked]}>
-                      {item.bought ? <Text style={styles.checkboxMark}>✓</Text> : null}
-                    </View>
-                    <Text style={[styles.itemName, item.bought && styles.itemNameBought]}>
-                      {item.name}
-                    </Text>
-                    {item.barcode ? <Badge label="no catálogo" variant="brand" /> : null}
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => removeItem(selectedList.id, item.id)}
-                    hitSlop={8}
-                  >
-                    <Text style={styles.removeText}>remover</Text>
-                  </TouchableOpacity>
-                </Card>
-              </TouchableOpacity>
-            ))
-          )}
-        </ScrollView>
-
-        <View style={styles.footer}>
-          <View style={styles.addItemRow}>
-            <TextInput
-              style={styles.input}
-              placeholder="Adicionar item (ex: Leite)"
-              value={newItemName}
-              onChangeText={setNewItemName}
-              onSubmitEditing={handleAddItem}
-              returnKeyType="done"
-            />
-            <Button label="Add" onPress={handleAddItem} />
-          </View>
-          <Button
-            label="Iniciar compra a partir desta lista"
-            onPress={handleStartShopping}
-            fullWidth
-            style={{ marginTop: spacing.sm }}
+      <Screen
+        header={
+          <ScreenHeader
+            title={selectedList.name}
+            subtitle={progressText(boughtCount, selectedList.items.length)}
+            onBack={() => setSelectedListId(null)}
           />
-        </View>
-      </View>
+        }
+        footer={
+          <>
+            <View style={styles.inlineForm}>
+              <TextField
+                placeholder="Adicionar item (ex.: Leite)"
+                value={newItemName}
+                onChangeText={setNewItemName}
+                onSubmitEditing={handleAddItem}
+                returnKeyType="done"
+                accessibilityLabel="Novo item"
+              />
+              <Button label="Adicionar" onPress={handleAddItem} disabled={!newItemName.trim()} />
+            </View>
+            <Button
+              label="Comprar a partir desta lista"
+              onPress={handleStartShopping}
+              disabled={selectedList.items.length === 0}
+              fullWidth
+            />
+          </>
+        }
+      >
+        {selectedList.items.length === 0 ? (
+          <EmptyState emoji="📝" title="Lista vazia" subtitle="Adicione o primeiro item abaixo." />
+        ) : (
+          <Card padded={false}>
+            {selectedList.items.map((item, index) => (
+              <View key={item.id} style={[styles.itemRow, index > 0 && styles.divider]}>
+                <TouchableOpacity
+                  style={styles.itemToggle}
+                  onPress={() => toggleBought(selectedList.id, item.id)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: item.bought }}
+                  accessibilityLabel={item.name}
+                >
+                  <View style={[styles.checkbox, item.bought && styles.checkboxChecked]}>
+                    {item.bought ? <Icon name="check" size={14} color={colors.onBrand} /> : null}
+                  </View>
+                  <Text style={[styles.itemName, item.bought && styles.itemNameBought]}>
+                    {item.name}
+                  </Text>
+                  {item.barcode ? <Badge label="no catálogo" variant="brand" /> : null}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => removeItem(selectedList.id, item.id)}
+                  hitSlop={hitSlop}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remover ${item.name}`}
+                >
+                  <Icon name="trash-2" size={17} color={colors.textFaint} />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </Card>
+        )}
+      </Screen>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.footer}>
-        <View style={styles.addItemRow}>
-          <TextInput
-            style={styles.input}
-            placeholder="Nome da nova lista (ex: Compras da semana)"
-            value={newListName}
-            onChangeText={setNewListName}
-            onSubmitEditing={handleCreateList}
-            returnKeyType="done"
-          />
-          <Button label="Criar" onPress={handleCreateList} />
-        </View>
-      </View>
+    <Screen header={<ScreenHeader title="Listas" subtitle="Organize o que precisa comprar." />}>
+      <Card style={styles.createCard}>
+        <TextField
+          label="Nova lista"
+          placeholder="Ex.: Compras da semana"
+          value={newListName}
+          onChangeText={setNewListName}
+          onSubmitEditing={handleCreateList}
+          returnKeyType="done"
+        />
+        <Button label="Criar lista" onPress={handleCreateList} disabled={!newListName.trim()} />
+      </Card>
 
       {lists.length === 0 ? (
         <EmptyState
           emoji="📝"
           title="Nenhuma lista ainda"
-          subtitle="Crie uma lista acima para organizar suas compras."
+          subtitle="Crie uma lista para marcar os itens enquanto compra."
         />
       ) : (
-        <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm }}>
-          {lists.map((list) => {
+        <Card padded={false}>
+          {lists.map((list, index) => {
             const boughtCount = list.items.filter((item) => item.bought).length;
             return (
-              <TouchableOpacity key={list.id} onPress={() => setSelectedListId(list.id)}>
-                <Card style={styles.listCard}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.listName}>{list.name}</Text>
-                    <Text style={styles.listProgress}>
-                      {boughtCount}/{list.items.length} itens comprados
-                    </Text>
-                  </View>
+              <ListRow
+                key={list.id}
+                icon="list"
+                title={list.name}
+                subtitle={progressText(boughtCount, list.items.length)}
+                divider={index > 0}
+                onPress={() => setSelectedListId(list.id)}
+                right={
                   <TouchableOpacity
                     onPress={() => handleRemoveList(list.id, list.name)}
-                    hitSlop={8}
+                    hitSlop={hitSlop}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remover lista ${list.name}`}
                   >
-                    <Text style={styles.removeText}>remover</Text>
+                    <Icon name="trash-2" size={17} color={colors.textFaint} />
                   </TouchableOpacity>
-                </Card>
-              </TouchableOpacity>
+                }
+              />
             );
           })}
-        </ScrollView>
+        </Card>
       )}
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surfaceAlt },
-  footer: {
-    padding: spacing.lg,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  addItemRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
-  input: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    ...typography.body,
-  },
-  listCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  listName: { ...typography.bodyStrong, color: colors.text },
-  listProgress: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
-  removeText: { ...typography.small, color: colors.danger },
-  detailHeader: {
-    padding: spacing.lg,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  backLink: { ...typography.bodyStrong, color: colors.brand },
-  detailTitle: { ...typography.h1, color: colors.text, marginTop: spacing.sm },
-  detailSubtitle: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+  createCard: { gap: spacing.md },
+  inlineForm: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: spacing.md,
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
-  itemLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1 },
+  divider: { borderTopWidth: 1, borderTopColor: colors.border },
+  itemToggle: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   checkbox: {
-    width: 22,
-    height: 22,
+    width: 24,
+    height: 24,
     borderRadius: radius.sm,
     borderWidth: 2,
     borderColor: colors.border,
@@ -220,7 +209,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkboxChecked: { backgroundColor: colors.brand, borderColor: colors.brand },
-  checkboxMark: { color: '#fff', fontWeight: '700', fontSize: 13 },
   itemName: { ...typography.body, color: colors.text, flexShrink: 1 },
   itemNameBought: { color: colors.textFaint, textDecorationLine: 'line-through' },
 });

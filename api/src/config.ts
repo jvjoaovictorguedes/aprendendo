@@ -16,6 +16,10 @@ const schema = z.object({
   // token vai no header Authorization (sem cookie), então isso é seguro.
   CORS_ORIGINS: z.string().default(''),
   SESSION_DAYS: z.coerce.number().int().min(1).max(365).default(30),
+  // Quantos proxies ficam na frente da API (Railway: 1). O IP do cliente é
+  // lido do X-Forwarded-For só até esse ponto — confiar em todos deixaria
+  // qualquer um forjar o IP e escapar do limite de tentativas de login.
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(1),
   PUSH_ENABLED: booleanFromEnv,
   DEMO_ENABLED: booleanFromEnv,
   DEMO_OWNER_PASSWORD: z.string().min(8).optional(),
