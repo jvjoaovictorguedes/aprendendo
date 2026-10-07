@@ -15,7 +15,7 @@ import {
 } from '../../components/ui';
 import { useLists } from '../../context/ListsContext';
 import { findProductByName } from '../../data/products';
-import { colors, hitSlop, radius, spacing, typography } from '../../theme/tokens';
+import { colors, hitSlop, minTouchSize, radius, spacing, typography } from '../../theme/tokens';
 import { confirmAction } from '../../utils/dialogs';
 
 function progressText(bought: number, total: number) {
@@ -168,8 +168,9 @@ export default function ListsScreen() {
                 subtitle={progressText(boughtCount, list.items.length)}
                 divider={index > 0}
                 onPress={() => setSelectedListId(list.id)}
-                right={
+                rightAction={
                   <TouchableOpacity
+                    style={styles.removeAction}
                     onPress={() => handleRemoveList(list.id, list.name)}
                     hitSlop={hitSlop}
                     accessibilityRole="button"
@@ -188,6 +189,12 @@ export default function ListsScreen() {
 }
 
 const styles = StyleSheet.create({
+  removeAction: {
+    width: minTouchSize,
+    height: minTouchSize,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   createCard: { gap: spacing.md },
   inlineForm: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
   itemRow: {

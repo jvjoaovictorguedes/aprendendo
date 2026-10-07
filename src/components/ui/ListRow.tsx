@@ -10,6 +10,8 @@ type Props = {
   icon?: Parameters<typeof Icon>[0]['name'];
   /** Conteúdo à direita; sem ele, linhas tocáveis mostram a seta. */
   right?: ReactNode;
+  /** Ação independente, fora do botão que abre a linha. */
+  rightAction?: ReactNode;
   onPress?: () => void;
   danger?: boolean;
   /** Linha divisória acima (para listas dentro de um Card sem padding). */
@@ -23,12 +25,13 @@ export function ListRow({
   subtitle,
   icon,
   right,
+  rightAction,
   onPress,
   danger,
   divider,
   accessibilityLabel,
 }: Props) {
-  const content = (
+  const mainContent = (
     <>
       {icon ? (
         <View style={[styles.iconWrap, danger && { backgroundColor: colors.dangerSoft }]}>
@@ -39,13 +42,37 @@ export function ListRow({
         <Text style={[styles.title, danger && { color: colors.danger }]}>{title}</Text>
         {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       </View>
+    </>
+  );
+  const style = [styles.row, divider && styles.divider];
+  if (rightAction) {
+    return (
+      <View style={[style, styles.actionRow]}>
+        {onPress ? (
+          <TouchableOpacity
+            style={styles.mainAction}
+            onPress={onPress}
+            accessibilityRole="button"
+            accessibilityLabel={accessibilityLabel ?? title}
+          >
+            {mainContent}
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.mainAction}>{mainContent}</View>
+        )}
+        {rightAction}
+      </View>
+    );
+  }
+  const content = (
+    <>
+      {mainContent}
       {right ??
         (onPress && !danger ? (
           <Icon name="chevron-right" size={18} color={colors.textFaint} />
         ) : null)}
     </>
   );
-  const style = [styles.row, divider && styles.divider];
   return onPress ? (
     <TouchableOpacity
       style={style}
@@ -61,6 +88,15 @@ export function ListRow({
 }
 
 const styles = StyleSheet.create({
+  actionRow: { paddingVertical: 0 },
+  mainAction: {
+    flex: 1,
+    minHeight: minTouchSize + 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+  },
   row: {
     minHeight: minTouchSize + 12,
     flexDirection: 'row',
