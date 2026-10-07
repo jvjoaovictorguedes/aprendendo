@@ -1,66 +1,40 @@
 import { Tabs } from 'expo-router';
-import { GestureResponderEvent, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, View, useWindowDimensions, type ColorValue } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '../../components/ui';
 import { useCart } from '../../context/CartContext';
 import { colors, radius } from '../../theme/tokens';
 
-function ScanTabButton({ onPress }: { onPress?: (event: GestureResponderEvent) => void }) {
+function ScanTabIcon() {
   const { items } = useCart();
   const count = items.reduce((sum, item) => sum + item.quantity, 0);
-
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.85}
-      accessibilityRole="button"
-      accessibilityLabel="Escanear produtos"
-      style={{
-        top: -22,
-        width: 58,
-        height: 58,
-        borderRadius: 29,
-        backgroundColor: colors.brand,
-        borderWidth: 4,
-        borderColor: colors.surface,
-        alignItems: 'center',
-        justifyContent: 'center',
-        alignSelf: 'center',
-        shadowColor: colors.brandDark,
-        shadowOpacity: 0.4,
-        shadowRadius: 10,
-        shadowOffset: { width: 0, height: 6 },
-        elevation: 6,
-      }}
-    >
-      <Icon name="camera" size={24} color={colors.onBrand} />
+    <View style={styles.scanner}>
+      <Icon name="camera" size={23} color={colors.onBrand} />
       {count > 0 ? (
-        <View
-          style={{
-            position: 'absolute',
-            top: -2,
-            right: -2,
-            minWidth: 18,
-            height: 18,
-            borderRadius: 9,
-            backgroundColor: colors.danger,
-            borderWidth: 2,
-            borderColor: colors.surface,
-            alignItems: 'center',
-            justifyContent: 'center',
-            paddingHorizontal: 2,
-          }}
-        >
-          <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700', lineHeight: 12 }}>
-            {count}
+        <View style={styles.badge}>
+          <Text style={styles.badgeText} allowFontScaling={false}>
+            {count > 99 ? '99+' : count}
           </Text>
         </View>
       ) : null}
-    </TouchableOpacity>
+    </View>
+  );
+}
+
+function TabLabel({ label, color }: { label: string; color: ColorValue }) {
+  return (
+    <Text style={[styles.label, { color }]} numberOfLines={1} maxFontSizeMultiplier={1.2}>
+      {label}
+    </Text>
   );
 }
 
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
+  const { fontScale } = useWindowDimensions();
+  const labelExtra = Math.ceil(16 * (Math.min(Math.max(fontScale, 1), 1.2) - 1));
   return (
     <Tabs
       screenOptions={{
@@ -68,21 +42,22 @@ export default function TabsLayout() {
         headerTintColor: '#fff',
         headerTitleStyle: { fontWeight: '700' },
         tabBarActiveTintColor: colors.brand,
-        tabBarInactiveTintColor: colors.textFaint,
-        tabBarLabelStyle: { fontSize: 10.5, fontWeight: '700' },
+        tabBarInactiveTintColor: colors.textMuted,
+        tabBarLabelPosition: 'below-icon',
+        tabBarLabel: ({ children, color }) => <TabLabel label={children} color={color} />,
+        tabBarIconStyle: { height: 40 },
+        tabBarItemStyle: { flex: 1, minWidth: 0 },
+        tabBarHideOnKeyboard: true,
         tabBarStyle: {
-          height: 64,
-          paddingTop: 8,
-          paddingBottom: 8,
+          // Includes the navigator's internal 5px padding above and below each item.
+          height: 80 + labelExtra + insets.bottom,
+          paddingTop: 6,
+          paddingBottom: 6 + insets.bottom,
           borderTopWidth: 0,
           borderTopLeftRadius: radius.xxl,
           borderTopRightRadius: radius.xxl,
           backgroundColor: colors.surface,
-          shadowColor: '#0A0C0E',
-          shadowOpacity: 0.08,
-          shadowRadius: 16,
-          shadowOffset: { width: 0, height: -4 },
-          elevation: 10,
+          boxShadow: '0 -3px 12px rgba(10, 12, 14, 0.08)',
         },
       }}
     >
@@ -91,7 +66,6 @@ export default function TabsLayout() {
         options={{
           title: 'Início',
           headerShown: false,
-          tabBarLabel: 'Início',
           tabBarIcon: ({ color }) => <Icon name="home" size={22} color={color} />,
         }}
       />
@@ -100,7 +74,6 @@ export default function TabsLayout() {
         options={{
           title: 'Ofertas',
           headerShown: false,
-          tabBarLabel: 'Ofertas',
           tabBarIcon: ({ color }) => <Icon name="percent" size={21} color={color} />,
         }}
       />
@@ -109,15 +82,15 @@ export default function TabsLayout() {
         options={{
           title: 'Comprar',
           headerShown: false,
-          tabBarLabel: () => null,
-          tabBarButton: ScanTabButton,
+          tabBarAccessibilityLabel: 'Escanear produtos',
+          tabBarIcon: () => <ScanTabIcon />,
         }}
       />
       <Tabs.Screen
         name="listas"
         options={{
           title: 'Minhas Listas',
-          tabBarLabel: 'Listas',
+          tabBarLabel: ({ color }) => <TabLabel label="Listas" color={color} />,
           tabBarIcon: ({ color }) => <Icon name="list" size={21} color={color} />,
         }}
       />
@@ -126,7 +99,6 @@ export default function TabsLayout() {
         options={{
           title: 'Conta',
           headerShown: false,
-          tabBarLabel: 'Conta',
           tabBarIcon: ({ color }) => <Icon name="user" size={22} color={color} />,
         }}
       />
@@ -138,3 +110,30 @@ export default function TabsLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  label: { fontSize: 11, lineHeight: 16, fontWeight: '700', textAlign: 'center', flexShrink: 0 },
+  scanner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badge: {
+    position: 'absolute',
+    top: -3,
+    right: -5,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.danger,
+    borderWidth: 2,
+    borderColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  badgeText: { color: '#fff', fontSize: 9, fontWeight: '700', lineHeight: 12 },
+});
