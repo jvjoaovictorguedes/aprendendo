@@ -1,14 +1,24 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createContext, PropsWithChildren, useContext, useEffect, useState } from 'react';
+import {
+  createContext,
+  PropsWithChildren,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from 'react';
 
 import { appTenantId, isApiConfigured } from '../services/api';
+import { demoStorageKey } from '../services/demo';
 import {
   DEFAULT_TENANT_SETTINGS,
   fetchAppTenantSettings,
   TenantSettings,
 } from '../services/tenantSettings';
 
-const STORAGE_KEY = `scanmercado:tenant-settings:${appTenantId ?? 'demo'}:v1`;
+const STORAGE_KEY = demoStorageKey(`scanmercado:tenant-settings:${appTenantId ?? 'demo'}:v1`);
+
+const RefreshContext = createContext<() => Promise<void>>(async () => {});
 
 const TenantSettingsContext = createContext<TenantSettings>(DEFAULT_TENANT_SETTINGS);
 
@@ -19,6 +29,13 @@ const TenantSettingsContext = createContext<TenantSettings>(DEFAULT_TENANT_SETTI
  */
 export function TenantSettingsProvider({ children }: PropsWithChildren) {
   const [settings, setSettings] = useState<TenantSettings>(DEFAULT_TENANT_SETTINGS);
+
+  const refresh = useCallback(async () => {
+    if (!isApiConfigured) return;
+    const remote = await fetchAppTenantSettings();
+    setSettings(remote);
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(remote));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,9 +65,15 @@ export function TenantSettingsProvider({ children }: PropsWithChildren) {
     };
   }, []);
 
-  return <TenantSettingsContext.Provider value={settings}>{children}</TenantSettingsContext.Provider>;
+  return (
+    <RefreshContext.Provider value={refresh}>
+      <TenantSettingsContext.Provider value={settings}>{children}</TenantSettingsContext.Provider>
+    </RefreshContext.Provider>
+  );
 }
 
 export function useTenantSettings(): TenantSettings {
   return useContext(TenantSettingsContext);
 }
+
+export const useRefreshTenantSettings = () => useContext(RefreshContext);

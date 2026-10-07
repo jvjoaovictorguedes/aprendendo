@@ -8,7 +8,11 @@ export type PushMessage = {
   body: string;
   channelId: string;
   sound: 'default';
-  data: { notificationId: string; target: 'cart' | 'promotions'; offerId: string | null };
+  data: {
+    notificationId: string;
+    target: 'cart' | 'promotions';
+    offerId: string | null;
+  };
   ttl: number;
 };
 type PushResult = { status: 'ok'; id?: string } | { status: 'error'; details?: { error?: string } };
@@ -29,7 +33,10 @@ export function expoTransport(accessToken?: string): PushTransport {
       signal: AbortSignal.timeout(10000),
     });
     if (!response.ok) throw new Error(`Expo HTTP ${response.status}`);
-    const result = (await response.json()) as { data?: unknown; errors?: unknown };
+    const result = (await response.json()) as {
+      data?: unknown;
+      errors?: unknown;
+    };
     if (result.errors || !result.data) throw new Error('Resposta inválida do serviço de push');
     return result.data;
   }
@@ -176,7 +183,7 @@ export async function runEngagement(
     }>(
       `select pref.* from notification_preferences pref
       join users u on u.id=pref.user_id join tenants t on t.id=pref.tenant_id
-      where u.disabled_at is null and u.role='customer' and t.status<>'suspensa' and (pref.cart_reminders or pref.personalized_offers)
+      where u.disabled_at is null and u.role='customer' and not t.is_demo and t.status<>'suspensa' and (pref.cart_reminders or pref.personalized_offers)
       and exists(select 1 from push_devices d join sessions s on s.id=d.session_id where d.user_id=u.id
         and d.active and s.revoked_at is null and s.expires_at>$1)
       and not exists(select 1 from customer_notifications n where n.user_id=u.id and n.created_at>$1::timestamptz-interval '24 hours')
@@ -309,7 +316,7 @@ export async function runEngagement(
     if (!delivery) break;
     const data = (
       await db.query(
-        `select n.*,d.token,d.active,d.user_id as device_user,s.revoked_at,s.expires_at,u.disabled_at,u.role,t.status as tenant_status,
+        `select n.*,d.token,d.active,d.user_id as device_user,s.revoked_at,s.expires_at,u.disabled_at,u.role,t.status as tenant_status,t.is_demo,
       pref.cart_reminders,pref.personalized_offers,c.status as cart_status,c.cart_key as current_cart,c.last_activity_at,c.store_id
       from customer_notifications n join push_devices d on d.id=$2 join sessions s on s.id=d.session_id
       join users u on u.id=n.user_id join tenants t on t.id=n.tenant_id
@@ -326,6 +333,7 @@ export async function runEngagement(
       data.expires_at <= now ||
       data.disabled_at ||
       data.role !== 'customer' ||
+      data.is_demo ||
       data.tenant_status === 'suspensa' ||
       (data.kind === 'cart' ? !data.cart_reminders : !data.personalized_offers) ||
       now.getTime() - new Date(data.created_at).getTime() > 24 * 3600000;

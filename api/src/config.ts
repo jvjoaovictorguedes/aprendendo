@@ -21,6 +21,8 @@ const schema = z.object({
   // qualquer um forjar o IP e escapar do limite de tentativas de login.
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(1),
   PUSH_ENABLED: booleanFromEnv,
+  DEMO_ENABLED: booleanFromEnv,
+  DEMO_OWNER_PASSWORD: z.string().min(8).optional(),
   EXPO_ACCESS_TOKEN: z.string().min(1).optional(),
   CART_REMINDER_MINUTES: z.coerce.number().int().min(15).max(1440).default(120),
   PUSH_TIMEZONE: z

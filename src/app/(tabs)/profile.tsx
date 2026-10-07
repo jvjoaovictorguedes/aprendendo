@@ -27,6 +27,7 @@ import { LoyaltyCard } from '../../components/LoyaltyCard';
 import { getTierProgress } from '../../utils/loyalty';
 import { formatBRL, parseDecimal } from '../../utils/pricing';
 import { showMessage } from '../../utils/dialogs';
+import { useDemo } from '../../context/DemoContext';
 
 function formatCpfInput(value: string): string {
   return value.replace(/\D/g, '').slice(0, 11);
@@ -94,6 +95,7 @@ function BudgetSection() {
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, login, register, logout } = useAuth();
+  const demo = useDemo();
   const { favoriteBarcodes, toggleFavorite } = useFavorites();
   const { purchases } = useHistory();
   const { pushEnabled, setPushEnabled, preferences, updatePreference, pushError, busy } =
@@ -352,7 +354,13 @@ export default function ProfileScreen() {
             loading={isSubmitting}
             fullWidth
           />
-          {isApiConfigured ? (
+          {demo.enabled ? (
+            <Button
+              label="Usar conta fictícia da apresentação"
+              variant="ghost"
+              onPress={() => router.push('/demonstracao')}
+            />
+          ) : isApiConfigured ? (
             <Button
               label={registering ? 'Já tenho conta' : 'Criar conta do clube'}
               variant="ghost"

@@ -183,6 +183,8 @@ TypeScript, lint, testes da API e dos cálculos verificam o fluxo. Gere o bundle
 
 O fluxo do lojista, regras de promoção e roteiro de validação estão em [docs/PROMOTIONS.md](docs/PROMOTIONS.md).
 
+Para apresentar ao mercado com catálogo fictício separado, contas de exemplo, caixa simulado e restauração, siga [docs/APRESENTACAO.md](docs/APRESENTACAO.md). As [etiquetas imprimíveis](docs/ETIQUETAS_DEMO.html) permitem demonstrar o scanner, inclusive a carne por preço.
+
 ## Fluxo de branches
 
 - **`main`** = produção. Só recebe código já testado, via Pull Request vindo da `dev`. Nunca commitar direto.

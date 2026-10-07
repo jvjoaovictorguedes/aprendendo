@@ -17,9 +17,11 @@ import { computeCartTotals, computeCartLines, formatBRL } from '../../utils/pric
 import { useNotifications } from '../../context/NotificationsContext';
 import { isApiConfigured } from '../../services/api';
 import { confirmAction } from '../../utils/dialogs';
+import { useDemo } from '../../context/DemoContext';
 
 export default function CartScreen() {
   const router = useRouter();
+  const demo = useDemo();
   const {
     items,
     incrementItem,
@@ -180,7 +182,14 @@ export default function CartScreen() {
             <Text style={styles.totalValue}>{formatBRL(totals.finalTotal)}</Text>
           </View>
           {confirmationError ? <Notice tone="error" message={confirmationError} /> : null}
-          {isApiConfigured && user ? (
+          {demo.enabled ? (
+            <Button
+              label="Demonstrar caixa"
+              onPress={() => router.push('/demonstracao')}
+              fullWidth
+            />
+          ) : null}
+          {isApiConfigured && user && !demo.enabled ? (
             <Button
               label="Já paguei no caixa"
               onPress={handleConfirmedPurchase}
@@ -191,14 +200,14 @@ export default function CartScreen() {
           ) : null}
           <View style={styles.actions}>
             <Button
-              label="Continuar comprando"
+              label="Continuar"
               variant="secondary"
               onPress={() => router.push('/comprar')}
               style={styles.flex}
             />
             <Button
               label="Salvar prévia"
-              variant={isApiConfigured && user ? 'secondary' : 'primary'}
+              variant={(isApiConfigured && user) || demo.enabled ? 'secondary' : 'primary'}
               onPress={handleCheckout}
               disabled={blocked}
               style={styles.flex}

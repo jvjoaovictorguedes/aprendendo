@@ -52,13 +52,15 @@ export async function authRoutes(app: FastifyInstance, { db, config, limiter }: 
 
   /** Franquia suspensa não aceita login nem cadastro de clientes no app. */
   async function assertTenantOpen(tenantId: string) {
-    const { rows } = await db.query<{ status: string }>('select status from tenants where id = $1', [
-      tenantId,
-    ]);
+    const { rows } = await db.query<{ status: string; is_demo: boolean }>(
+      'select status, is_demo from tenants where id = $1',
+      [tenantId],
+    );
     if (!rows[0]) throw badRequest('Franquia não encontrada.');
     if (rows[0].status === 'suspensa') {
       throw forbidden('Este mercado está temporariamente indisponível no app.');
     }
+    return rows[0];
   }
 
   /** Login do painel admin (equipe da plataforma e admins de franquia). */
@@ -124,7 +126,11 @@ export async function authRoutes(app: FastifyInstance, { db, config, limiter }: 
         password,
       })
       .parse(request.body);
-    await assertTenantOpen(tenantId);
+    const tenant = await assertTenantOpen(tenantId);
+    if (tenant.is_demo)
+      throw badRequest(
+        'Use a conta fictícia da apresentação. Não cadastre dados pessoais nesta loja.',
+      );
     const user = (
       await db.query<{ id: string }>(
         `insert into users (tenant_id,role,name,cpf,password_hash) values ($1,'customer',$2,$3,$4) returning id`,
