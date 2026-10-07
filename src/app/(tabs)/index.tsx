@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import {
@@ -33,16 +33,32 @@ const QUICK_ACTIONS = [
   { label: 'Lojas', icon: 'map-pin', href: '/lojas' },
 ] as const;
 
-function getGreeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Bom dia';
-  if (hour < 18) return 'Boa tarde';
+/** Saudação pelo horário do aparelho: 5h–11h59 dia, 12h–17h59 tarde, resto noite. */
+function getGreeting(date = new Date()): string {
+  const hour = date.getHours();
+  if (hour >= 5 && hour < 12) return 'Bom dia';
+  if (hour >= 12 && hour < 18) return 'Boa tarde';
   return 'Boa noite';
+}
+
+/** Recalcula ao voltar para a tela e a cada minuto, para virar na hora certa. */
+function useGreeting(): string {
+  const [greeting, setGreeting] = useState(getGreeting);
+  useFocusEffect(
+    useCallback(() => {
+      setGreeting(getGreeting());
+      const timer = setInterval(() => setGreeting(getGreeting()), 60_000);
+      return () => clearInterval(timer);
+    }, []),
+  );
+  return greeting;
 }
 
 export default function HomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const greeting = useGreeting();
+  const firstName = user?.name.trim().split(/\s+/)[0] || 'Cliente';
   const { items, addByBarcode } = useCart();
   const { extraPercentOffFor, offers } = usePromotions();
   const storeOffers = offers
@@ -95,9 +111,8 @@ export default function HomeScreen() {
           />
         ) : null}
         <View style={{ flex: 1 }}>
-          <Text style={styles.greeting}>
-            {getGreeting()}
-            {user ? `, ${user.name.split(' ')[0]}` : ''}
+          <Text style={styles.greeting} numberOfLines={1}>
+            {greeting}, {firstName}
           </Text>
           <Text style={styles.store}>{brand.name}</Text>
         </View>
@@ -240,7 +255,7 @@ export default function HomeScreen() {
         </ScrollView>
       </Section>
 
-      <View style={styles.sectionPadding}>
+      <View style={[styles.sectionPadding, styles.bannerSpacing]}>
         <TouchableOpacity
           style={styles.couponBanner}
           onPress={() => router.push(user ? '/promotions' : '/profile')}
@@ -347,6 +362,8 @@ const styles = StyleSheet.create({
   store: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
   sectionPadding: { paddingHorizontal: spacing.lg },
   stack: { gap: spacing.md },
+  // Mesmo respiro que separa as seções (Section usa marginTop xl).
+  bannerSpacing: { marginTop: spacing.xl },
   searchResults: { padding: spacing.sm },
   searchRow: {
     flexDirection: 'row',
