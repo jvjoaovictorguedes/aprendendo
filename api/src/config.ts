@@ -17,6 +17,8 @@ const schema = z.object({
   CORS_ORIGINS: z.string().default(''),
   SESSION_DAYS: z.coerce.number().int().min(1).max(365).default(30),
   PUSH_ENABLED: booleanFromEnv,
+  DEMO_ENABLED: booleanFromEnv,
+  DEMO_OWNER_PASSWORD: z.string().min(8).optional(),
   EXPO_ACCESS_TOKEN: z.string().min(1).optional(),
   CART_REMINDER_MINUTES: z.coerce.number().int().min(15).max(1440).default(120),
   PUSH_TIMEZONE: z

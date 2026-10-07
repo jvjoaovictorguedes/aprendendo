@@ -1,3 +1,4 @@
+import { demoStorageKey } from '../services/demo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   createContext,
@@ -11,11 +12,15 @@ import {
 
 import { CartItem, Purchase } from '../types';
 
-const STORAGE_KEY = 'scanmercado:history:v1';
+const STORAGE_KEY = demoStorageKey('scanmercado:history:v1');
 
 type HistoryContextValue = {
   purchases: Purchase[];
-  addPurchase: (items: CartItem[], totals: { originalTotal: number; finalTotal: number; savings: number }) => Purchase;
+  clearHistory: () => void;
+  addPurchase: (
+    items: CartItem[],
+    totals: { originalTotal: number; finalTotal: number; savings: number },
+  ) => Purchase;
 };
 
 const HistoryContext = createContext<HistoryContextValue | undefined>(undefined);
@@ -51,9 +56,11 @@ export function HistoryProvider({ children }: PropsWithChildren) {
     [],
   );
 
+  const clearHistory = useCallback(() => setPurchases([]), []);
+
   const value = useMemo<HistoryContextValue>(
-    () => ({ purchases, addPurchase }),
-    [purchases, addPurchase],
+    () => ({ purchases, addPurchase, clearHistory }),
+    [purchases, addPurchase, clearHistory],
   );
 
   return <HistoryContext.Provider value={value}>{children}</HistoryContext.Provider>;

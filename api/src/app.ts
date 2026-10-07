@@ -11,6 +11,7 @@ import { authRoutes } from './routes/auth.js';
 import { offerRoutes } from './routes/offers.js';
 import { publicRoutes } from './routes/public.js';
 import { engagementRoutes } from './routes/engagement.js';
+import { demoRoutes } from './routes/demo.js';
 
 export type Deps = {
   db: Db;
@@ -58,7 +59,10 @@ export async function buildApp(
   });
 
   await app.register(async (scope) => offerRoutes(scope, deps));
-  await app.register(async (scope) => engagementRoutes(scope, deps), { prefix: '/customer' });
+  await app.register(async (scope) => engagementRoutes(scope, deps), {
+    prefix: '/customer',
+  });
+  await app.register(async (scope) => demoRoutes(scope, deps));
 
   return app;
 }

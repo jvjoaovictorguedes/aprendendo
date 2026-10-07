@@ -1,3 +1,4 @@
+import { demoStorageKey } from '../services/demo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   createContext,
@@ -9,7 +10,7 @@ import {
   useState,
 } from 'react';
 
-const STORAGE_KEY = 'scanmercado:favorites:v1';
+const STORAGE_KEY = demoStorageKey('scanmercado:favorites:v1');
 
 type FavoritesContextValue = {
   favoriteBarcodes: string[];

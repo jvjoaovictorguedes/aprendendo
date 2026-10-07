@@ -16,9 +16,11 @@ import { cartItemKey } from '../../types';
 import { computeCartTotals, computeCartLines, formatBRL } from '../../utils/pricing';
 import { useNotifications } from '../../context/NotificationsContext';
 import { isApiConfigured } from '../../services/api';
+import { useDemo } from '../../context/DemoContext';
 
 export default function CartScreen() {
   const router = useRouter();
+  const demo = useDemo();
   const {
     items,
     incrementItem,
@@ -249,7 +251,10 @@ export default function CartScreen() {
           fullWidth
           style={{ marginTop: spacing.sm }}
         />
-        {isApiConfigured && user ? (
+        {demo.enabled ? (
+          <Button label="Demonstrar caixa" onPress={() => router.push('/demonstracao')} />
+        ) : null}
+        {isApiConfigured && user && !demo.enabled ? (
           <Button
             label="Já comprei no caixa"
             onPress={handleConfirmedPurchase}
