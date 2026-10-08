@@ -2,6 +2,9 @@
 // e do painel admin passa por aqui.
 
 const apiUrl = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/+$/, '');
+export function resolveAssetUrl(url: string | null): string | null {
+  return url?.startsWith('/public/tenant-logos/') ? `${apiUrl}${url}` : url;
+}
 // Qual franquia (tenant) este build do app representa. Vai no header
 // x-tenant-id das rotas públicas — a API filtra tudo por ela.
 export const appTenantId = process.env.EXPO_PUBLIC_TENANT_ID || null;

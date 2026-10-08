@@ -84,7 +84,10 @@ export async function adminTenantRoutes(app: FastifyInstance, { db, config }: De
       .object({
         name: z.string().trim().min(1, 'Informe o nome.').optional(),
         accentColor: hexColor.optional(),
-        logoUrl: logoUrl.optional(),
+        logoUrl: z.union([
+          logoUrl,
+          z.string().regex(/^\/public\/tenant-logos\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/),
+        ]).optional(),
         slug: slug.optional(),
         plan: plan.optional(),
         status: status.optional(),
