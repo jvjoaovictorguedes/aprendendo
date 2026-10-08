@@ -33,7 +33,7 @@ describe('boot', () => {
 describe('app do cliente (público)', () => {
   it('marca da franquia do header', async () => {
     const brand = await api.request('GET', '/public/brand', { tenant: PILOT });
-    assert.deepEqual(brand.body, { name: 'ScanMercado', accentColor: '#1DB954', logoUrl: null });
+    assert.deepEqual(brand.body, { name: 'Bipou', accentColor: '#1DB954', logoUrl: null });
   });
 
   it('sem header de franquia é recusado', async () => {
@@ -129,7 +129,7 @@ describe('gestão de usuários', () => {
     });
     assert.equal(created.status, 201);
     assert.equal(created.body.user.email, 'lojista@mercado.com');
-    assert.equal(created.body.user.tenantName, 'ScanMercado');
+    assert.equal(created.body.user.tenantName, 'Bipou');
     assert.equal(created.body.temporaryPassword.length, 12);
     lojistaId = created.body.user.id;
 

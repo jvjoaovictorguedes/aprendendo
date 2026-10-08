@@ -1,4 +1,6 @@
-# ScanMercado (app piloto)
+# Bipou
+
+> **Bipou, somou e comprou.**
 
 App mobile (Expo / React Native) para clientes de supermercado. O cliente **bipa o código de barras** de cada produto com a câmera do celular enquanto faz as compras, e o app vai somando os valores — incluindo promoções — para mostrar uma **prévia do total a pagar** antes de chegar ao caixa.
 
@@ -64,7 +66,7 @@ A partir daí o scanner consulta o catálogo da franquia na API (`src/services/c
 
 Um banco para **várias franquias com exclusividade territorial** — cada uma com sua marca, cores, balança e catálogo, sem enxergar os dados das outras. O isolamento é feito pela API: toda consulta filtra pela franquia de quem chama (header `x-tenant-id` no app, franquia do usuário no painel).
 
-Papéis (`users.role`): **`platform_admin`** (equipe ScanMercado — todas as franquias e usuários), **`tenant_admin`** (dono da franquia — só a própria), **`customer`** (cliente do app de uma franquia, entra por CPF).
+Papéis (`users.role`): **`platform_admin`** (equipe Bipou — todas as franquias e usuários), **`tenant_admin`** (dono da franquia — só a própria), **`customer`** (cliente do app de uma franquia, entra por CPF).
 
 | Tabela | Pra quê serve |
 |---|---|
@@ -83,7 +85,7 @@ Fica no próprio app, em `/admin` — no celular pela aba **Conta → Área do l
 
 | Tela | O que configura |
 |---|---|
-| Plataforma | Início da equipe ScanMercado: Franquias e Usuários. `tenant_admin` cai direto na própria franquia. |
+| Plataforma | Início da equipe Bipou: Franquias e Usuários. `tenant_admin` cai direto na própria franquia. |
 | Franquias | Lista e cria franquias (já nascem com a configuração padrão). |
 | Usuários | Só a plataforma cria acessos: e-mail, nome, papel e franquia. A conta nasce com **senha temporária gerada no servidor**, mostrada uma vez. Também redefine senha e bloqueia/desbloqueia (vale na hora). |
 | Promoções e cupons | Criar, editar, agendar e pausar ofertas; selecionar produto, público, loja, validade, limite e condições. |

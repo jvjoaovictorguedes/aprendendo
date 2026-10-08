@@ -1,8 +1,8 @@
 {
-  "name": "scanmercado-api",
+  "name": "bipou-api",
   "version": "1.0.0",
   "private": true,
-  "description": "API do ScanMercado (app do cliente + painel admin) — PostgreSQL no Railway",
+  "description": "API do Bipou (app do cliente + painel admin) — PostgreSQL no Railway",
   "type": "module",
   "main": "dist/server.js",
   "engines": {

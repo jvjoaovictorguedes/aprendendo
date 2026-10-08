@@ -1,6 +1,7 @@
 {
   "expo": {
-    "name": "ScanMercado",
+    "name": "Bipou",
+    "description": "Bipou, somou e comprou. Bipe os produtos no mercado e veja o total antes do caixa.",
     "slug": "scanmercado",
     "scheme": "scanmercado",
     "version": "1.0.1",

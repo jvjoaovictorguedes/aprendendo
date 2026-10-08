@@ -207,8 +207,8 @@ export default function BrandScreen() {
             title="Contrato"
             description={
               isPlatformAdmin
-                ? 'Dados comerciais — só a equipe ScanMercado pode alterar.'
-                : 'Para mudar plano, status ou território, fale com a equipe ScanMercado.'
+                ? 'Dados comerciais — só a equipe Bipou pode alterar.'
+                : 'Para mudar plano, status ou território, fale com a equipe Bipou.'
             }
           >
             <FieldRow>

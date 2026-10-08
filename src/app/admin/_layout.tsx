@@ -35,7 +35,7 @@ function AdminLogin() {
   return (
     <AdminPage
       title="Entrar no painel"
-      subtitle="Acesso para a equipe ScanMercado e para os administradores de cada franquia."
+      subtitle="Acesso para a equipe Bipou e para os administradores de cada franquia."
       onBack={() => router.replace('/')}
       backLabel="Voltar ao app"
     >

@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { colors, radius, spacing, typography } from '../../theme/tokens';
+import { colors, platform, radius, spacing, typography } from '../../theme/tokens';
 import { Icon } from '../ui';
 
 const MAX_CONTENT_WIDTH = 960;
@@ -47,7 +47,8 @@ export function AdminPage({
     >
       <View style={[styles.topBar, { paddingTop: insets.top + spacing.md }]}>
         <View style={styles.topBarInner}>
-          <Text style={styles.brand}>ScanMercado · Admin</Text>
+          <Text style={styles.brand}>{platform.name} · Admin</Text>
+          <Text style={styles.slogan}>{platform.slogan}</Text>
         </View>
       </View>
       <ScrollView
@@ -269,6 +270,7 @@ const styles = StyleSheet.create({
   },
   topBarInner: { width: '100%', maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center' },
   brand: { color: '#fff', ...typography.bodyStrong },
+  slogan: { color: 'rgba(255,255,255,0.65)', ...typography.small, marginTop: 2 },
   scroll: { padding: spacing.lg },
   content: { width: '100%', maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center', gap: spacing.lg },
   back: { flexDirection: 'row', alignItems: 'center', gap: 2 },

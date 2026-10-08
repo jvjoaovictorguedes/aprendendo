@@ -43,7 +43,7 @@ const schema = z.object({
     .string()
     .min(8, 'ADMIN_PASSWORD precisa ter pelo menos 8 caracteres')
     .optional(),
-  ADMIN_NAME: z.string().default('Equipe ScanMercado'),
+  ADMIN_NAME: z.string().default('Equipe Bipou'),
 
   // Cliente de teste (CPF 12345678900 / senha 123456) na franquia piloto.
   // Só para ambiente de teste — deixe desligado em produção.

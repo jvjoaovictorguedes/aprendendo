@@ -11,7 +11,7 @@ import { createPool } from '../src/db/pool.js';
 
 export const PILOT = '00000000-0000-0000-0000-000000000001';
 export const OTHER_TENANT = '00000000-0000-0000-0000-000000000002';
-export const ADMIN_EMAIL = 'dono@scanmercado.com.br';
+export const ADMIN_EMAIL = 'dono@bipou.com.br';
 export const ADMIN_PASSWORD = 'senha-forte-123';
 
 let nextPort = 55432 + Math.floor(Math.random() * 1000);

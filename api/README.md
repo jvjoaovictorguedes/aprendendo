@@ -1,6 +1,6 @@
-# ScanMercado API
+# Bipou API
 
-Back-end do ScanMercado: app do cliente + painel admin, num PostgreSQL padrão (Railway).
+Back-end do Bipou: app do cliente + painel admin, num PostgreSQL padrão (Railway).
 
 - **Node.js 22+ / TypeScript**, Fastify, `pg`
 - **Login próprio**: senha em bcrypt, token JWT ligado a uma sessão no banco — bloquear usuário, redefinir senha ou sair valem na hora

@@ -1,4 +1,4 @@
-// Design tokens do ScanMercado. Toda tela/componente deve consumir
+// Design tokens do Bipou. Toda tela/componente deve consumir
 // daqui em vez de usar valores soltos (cor, espaçamento, radius...).
 //
 // As cores da marca (brand*) são da franquia: applyBrand() troca antes de
@@ -34,9 +34,15 @@ export const colors = {
   onDarkSoft: 'rgba(255, 255, 255, 0.16)',
 };
 
-/** Nome e logo da franquia deste app (padrão: ScanMercado). */
+/** A plataforma (o produto), independente da franquia. */
+export const platform = {
+  name: 'Bipou',
+  slogan: 'Bipou, somou e comprou.',
+} as const;
+
+/** Nome e logo da franquia deste app (padrão: Bipou). */
 export const brand: { name: string; logoUrl: string | null } = {
-  name: 'ScanMercado',
+  name: platform.name,
   logoUrl: null,
 };
 

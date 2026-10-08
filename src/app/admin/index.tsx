@@ -6,7 +6,7 @@ import { Button } from '../../components/ui';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import { spacing } from '../../theme/tokens';
 
-/** Início do painel da plataforma (equipe ScanMercado). */
+/** Início do painel da plataforma (equipe Bipou). */
 export default function PlatformHome() {
   const router = useRouter();
   const { profile, isPlatformAdmin, signOut } = useAdminAuth();

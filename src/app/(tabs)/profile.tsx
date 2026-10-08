@@ -22,7 +22,7 @@ import { isApiConfigured } from '../../services/api';
 import { useCart } from '../../context/CartContext';
 import { usePromotions } from '../../context/PromotionsContext';
 import { findProductByBarcode } from '../../data/products';
-import { brand, colors, radius, spacing, typography } from '../../theme/tokens';
+import { brand, colors, platform, radius, spacing, typography } from '../../theme/tokens';
 import { LoyaltyCard } from '../../components/LoyaltyCard';
 import { getTierProgress } from '../../utils/loyalty';
 import { formatBRL, parseDecimal } from '../../utils/pricing';
@@ -310,7 +310,7 @@ export default function ProfileScreen() {
         header={
           <ScreenHeader
             title="Conta"
-            subtitle="Entre para ver seus pontos e ativar ofertas do clube."
+            subtitle={`${platform.slogan} Entre para ver seus pontos e ativar ofertas do clube.`}
           />
         }
       >

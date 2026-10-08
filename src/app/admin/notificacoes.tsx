@@ -90,7 +90,7 @@ export default function PlatformNotificationsScreen() {
   return (
     <AdminPage
       title="Notificações da plataforma"
-      subtitle="Acesso exclusivo da equipe ScanMercado. Estas regras valem para todas as franquias."
+      subtitle="Acesso exclusivo da equipe Bipou. Estas regras valem para todas as franquias."
       onBack={() => router.push('/admin')}
     >
       <StatusMessage status={status} />

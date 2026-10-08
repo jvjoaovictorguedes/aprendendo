@@ -1,4 +1,4 @@
-// Cliente da API do ScanMercado (api/ — Railway). Todo acesso a dados do app
+// Cliente da API do Bipou (api/ — Railway). Todo acesso a dados do app
 // e do painel admin passa por aqui.
 
 const apiUrl = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/+$/, '');
