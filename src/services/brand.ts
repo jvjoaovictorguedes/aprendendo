@@ -1,7 +1,7 @@
 import { demoStorageKey } from './demo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { apiRequest, isApiConfigured } from './api';
+import { apiRequest, isApiConfigured, resolveAssetUrl } from './api';
 
 export type AppBrand = {
   name: string;
@@ -27,6 +27,7 @@ function refreshCache(): Promise<AppBrand | null> {
   if (!isApiConfigured) return Promise.resolve(null);
   return apiRequest<AppBrand>('/public/brand', { tenant: true })
     .then((remote) => {
+      remote = { ...remote, logoUrl: resolveAssetUrl(remote.logoUrl) };
       AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(remote)).catch(() => {});
       return remote;
     })

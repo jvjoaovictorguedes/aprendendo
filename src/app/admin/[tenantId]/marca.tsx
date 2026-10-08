@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 
 import {
   AdminPage,
@@ -17,6 +18,8 @@ import { Button } from '../../../components/ui';
 import { useAdminAuth } from '../../../context/AdminAuthContext';
 import { describeError, Tenant, updateTenant } from '../../../services/admin';
 import { colors, radius, spacing, typography } from '../../../theme/tokens';
+import { resolveAssetUrl } from '../../../services/api';
+import { uploadLogo, removeLogo } from '../../../services/logos';
 
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
@@ -28,6 +31,7 @@ export default function BrandScreen() {
   const [draft, setDraft] = useState<Tenant | null>(null);
   const [status, setStatus] = useState<Status>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Edições locais por cima da franquia carregada.
   const form = draft ?? tenant;
@@ -42,6 +46,48 @@ export default function BrandScreen() {
 
   const colorError = form && !HEX_COLOR.test(form.accentColor) ? 'Use o formato #RRGGBB.' : null;
   const nameError = form && !form.name.trim() ? 'Informe o nome.' : null;
+
+  async function chooseLogo() {
+    setIsUploading(true);
+    setStatus(null);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        base64: true,
+        quality: 1,
+        allowsMultipleSelection: false,
+      });
+      if (result.canceled) return;
+      const asset = result.assets[0];
+      if (!asset.base64) throw new Error('Não foi possível ler a imagem. Escolha outra.');
+      if ((asset.fileSize ?? 0) > 5 * 1024 * 1024)
+        throw new Error('Escolha uma imagem de até 5 MB.');
+      const saved = await uploadLogo(tenantId, asset.base64);
+      update({ logoUrl: saved.logoUrl });
+      reload();
+      setStatus({
+        kind: 'success',
+        message: `Logo salva e otimizada: ${Math.max(1, Math.round(saved.optimizedBytes / 1024))} KB. Ela aparecerá na próxima abertura do app.`,
+      });
+    } catch (err) {
+      setStatus({ kind: 'error', message: describeError(err) });
+    } finally {
+      setIsUploading(false);
+    }
+  }
+  async function clearLogo() {
+    setIsUploading(true);
+    try {
+      await removeLogo(tenantId);
+      update({ logoUrl: null });
+      reload();
+      setStatus({ kind: 'success', message: 'Logo removida. O app usará o nome do mercado.' });
+    } catch (err) {
+      setStatus({ kind: 'error', message: describeError(err) });
+    } finally {
+      setIsUploading(false);
+    }
+  }
 
   const handleSave = async () => {
     if (!form || colorError || nameError) return;
@@ -78,14 +124,23 @@ export default function BrandScreen() {
       backLabel={tenant?.name ?? 'Franquia'}
     >
       {!form ? (
-        error ? <StatusMessage status={{ kind: 'error', message: error }} /> : <Loading />
+        error ? (
+          <StatusMessage status={{ kind: 'error', message: error }} />
+        ) : (
+          <Loading />
+        )
       ) : (
         <>
           <AdminSection
             title="Marca"
             description="Como a franquia aparece para os clientes. O app aplica a nova marca na próxima vez que for aberto."
           >
-            <Field label="Nome" value={form.name} onChangeText={(name) => update({ name })} error={nameError} />
+            <Field
+              label="Nome"
+              value={form.name}
+              onChangeText={(name) => update({ name })}
+              error={nameError}
+            />
             <View style={styles.colorRow}>
               <View style={{ flex: 1 }}>
                 <Field
@@ -105,13 +160,46 @@ export default function BrandScreen() {
                 ]}
               />
             </View>
+            <View style={styles.logoPreview}>
+              {form.logoUrl ? (
+                <Image
+                  source={{ uri: resolveAssetUrl(form.logoUrl)! }}
+                  style={styles.logoImage}
+                  resizeMode="contain"
+                  accessibilityLabel={`Logo de ${form.name}`}
+                />
+              ) : (
+                <Text style={styles.note}>Sua logo aparecerá aqui</Text>
+              )}
+            </View>
+            <Button
+              label={form.logoUrl ? 'Trocar logo' : 'Escolher logo'}
+              onPress={() => void chooseLogo()}
+              loading={isUploading}
+              disabled={isSaving}
+              variant="secondary"
+            />
+            {form.logoUrl ? (
+              <Button
+                label="Remover logo"
+                variant="ghost"
+                onPress={() => void clearLogo()}
+                disabled={isUploading || isSaving}
+              />
+            ) : null}
+            <Text style={styles.note}>
+              PNG, JPG ou WebP, até 5 MB. A logo é salva ao enviar, com compressão automática e
+              transparência preservada.
+            </Text>
             <Field
-              label="URL do logo"
-              value={form.logoUrl ?? ''}
+              label="Ou usar uma URL externa"
+              value={form.logoUrl?.startsWith('/public/tenant-logos/') ? '' : form.logoUrl ?? ''}
               onChangeText={(logoUrl) => update({ logoUrl })}
               autoCapitalize="none"
               keyboardType="url"
               placeholder="https://..."
+              hint="Opcional: use um endereço de imagem já hospedada em vez do upload."
+              editable={!isUploading}
             />
           </AdminSection>
 
@@ -153,7 +241,9 @@ export default function BrandScreen() {
               onChange={(status) => update({ status })}
               disabled={!isPlatformAdmin}
             />
-            {form.isInternal ? <Text style={styles.note}>Franquia interna (piloto), não é cliente pagante.</Text> : null}
+            {form.isInternal ? (
+              <Text style={styles.note}>Franquia interna (piloto), não é cliente pagante.</Text>
+            ) : null}
           </AdminSection>
 
           <StatusMessage status={status} />
@@ -161,7 +251,7 @@ export default function BrandScreen() {
             label="Salvar"
             onPress={handleSave}
             loading={isSaving}
-            disabled={Boolean(colorError || nameError)}
+            disabled={Boolean(colorError || nameError) || isUploading}
           />
         </>
       )}
@@ -170,6 +260,15 @@ export default function BrandScreen() {
 }
 
 const styles = StyleSheet.create({
+  logoPreview: {
+    minHeight: 120,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceAlt,
+  },
+  logoImage: { width: '100%', height: 100 },
   colorRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   swatch: {
     width: 44,

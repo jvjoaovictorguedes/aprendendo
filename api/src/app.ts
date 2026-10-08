@@ -13,6 +13,7 @@ import { publicRoutes } from './routes/public.js';
 import { engagementRoutes } from './routes/engagement.js';
 import { platformNotificationRoutes } from './routes/platformNotifications.js';
 import { demoRoutes } from './routes/demo.js';
+import { logoRoutes } from './routes/logos.js';
 
 export type Deps = {
   db: Db;
@@ -72,5 +73,6 @@ export async function buildApp(
   await app.register(async (scope) => demoRoutes(scope, deps));
 
   await app.register(async (scope) => platformNotificationRoutes(scope, deps));
+  await app.register(async (scope) => logoRoutes(scope, deps));
   return app;
 }

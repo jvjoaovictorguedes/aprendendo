@@ -3,7 +3,7 @@
     "name": "ScanMercado",
     "slug": "scanmercado",
     "scheme": "scanmercado",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -36,7 +36,15 @@
           "cameraPermission": "Precisamos da câmera para ler o código de barras dos produtos."
         }
       ],
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Selecione a logo do mercado para personalizar o aplicativo.",
+          "cameraPermission": "Precisamos da câmera para ler o código de barras dos produtos.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
